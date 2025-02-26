@@ -148,8 +148,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := utils.EscapeString(r.FormValue("username"))
-	// fmt.Println(username)
+	username := utils.EscapeString(r.FormValue("nickname"))
 
 	email := utils.EscapeString(r.FormValue("email"))
 	password := utils.EscapeString(r.FormValue("password"))
