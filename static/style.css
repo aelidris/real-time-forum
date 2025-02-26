@@ -96,7 +96,9 @@ a, button, input, textarea {
 
 /* Main Content Styles */
 .main-content {
-  flex: 1;
+  display: flex;
+  gap: 20px;
+  /* flex: 1; */
   padding: 2rem 1rem;
 }
 
@@ -556,3 +558,14 @@ button:disabled {
 #ownershipFilterContainer {
   margin-top: 20px;
 }
+
+/****************************************/
+.online-users {
+  width: 30%;
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  height: fit-content;
+}
+/****************************************/
