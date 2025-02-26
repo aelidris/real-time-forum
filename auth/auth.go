@@ -214,7 +214,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	sessionToken, _ := uuid.NewV4()
 
 	// Insert user into the database
-	_, err = database.DB.Exec(`
+	result, err := database.DB.Exec(`
 	INSERT INTO users (username, email, password, session_token, age, gender, first_name, last_name, created_at)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 		username, email, hashedPassword, sessionToken.String(), age, gender, firstName, lastName)
@@ -222,6 +222,27 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error inserting user: %v", err)
 		response = map[string]string{"error": "Registration failed"}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Get the last inserted user ID
+	userID, err := result.LastInsertId()
+	if err != nil {
+		log.Printf("Error retrieving last insert ID: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Add the user to the chats table (if needed)
+	_, err = database.DB.Exec(`
+		INSERT INTO chats (sender_id, receiver_id, message, sent_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		userID, 0, "Welcome to the chat!") // Assuming receiver_id 0 is for system messages
+
+	if err != nil {
+		log.Printf("Error inserting user into chat table: %v", err)
+		response = map[string]string{"error": "Chat registration failed"}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

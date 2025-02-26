@@ -41,13 +41,27 @@ document
       .then((response) => {
         return response.json().then((data) => {
           if (!response.ok) {
+            
             throw data;
           }
           return data;
         });
       })
       .then((data) => {
+        
+        // **Store session token in localStorage**
+        if (data.session_token) {
+          localStorage.setItem("session_token", data.session_token);
+        }
+        console.log("Storing session token:", data.session_token);
+        
+
         alert(data.message);
+
+        // After successful login
+localStorage.setItem("username", data.username);
+
+
         document.getElementById("loginForm").reset();
         setTimeout(() => {
           window.location.href = "/";

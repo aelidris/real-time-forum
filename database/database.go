@@ -173,5 +173,24 @@ func createTables() error {
 		log.Println("Default categories inserted or already exist")
 	}
 
+	// table using for the chat between users
+	_, err = DB.Exec(`
+    	CREATE TABLE IF NOT EXISTS chats (
+    	    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    	    sender_id INTEGER NOT NULL,
+    	    receiver_id INTEGER NOT NULL,
+    	    message TEXT NOT NULL,
+    	    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    	    FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
+    	    FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE
+    	);
+	`)
+	if err != nil {
+	    log.Printf("Error creating 'chats' table: %v", err)
+	    return err
+	} else {
+	    log.Println("'chats' table created or already exists")
+}
+
 	return nil
 }
