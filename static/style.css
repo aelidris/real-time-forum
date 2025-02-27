@@ -568,4 +568,69 @@ button:disabled {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
   height: fit-content;
 }
+
+/* Add this to your CSS file */
+.online-user {
+  padding: 10px;
+  margin: 5px 0;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.online-user:hover {
+  background-color: #ddd;
+}
+
+.private-chat {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  width: 300px;
+  background: white;
+  border: 1px solid #ccc;
+  padding: 10px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  display: none; /* Hidden by default */
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-chat {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.chat-messages {
+  list-style: none;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.chat-messages li {
+  padding: 5px 10px;
+  margin: 5px 0;
+  border-radius: 5px;
+}
+
+.sent-message {
+  background: #dcf8c6;
+  align-self: flex-end;
+}
+
+.received-message {
+  background: #f1f0f0;
+  align-self: flex-start;
+}
+
+
+
 /****************************************/
