@@ -85,6 +85,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
+		// Store the message in the database
+		saveMessage(msg.Sender, msg.Receiver, msg.Content)
+
 		if msg.Receiver != "" {
 			// Private message
 			sendPrivateMessage(msg)
@@ -94,6 +97,35 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+func saveMessage(senderUsername, receiverUsername, content string) {
+    var senderID, receiverID int
+
+    // Get sender ID
+    err := database.DB.QueryRow("SELECT id FROM users WHERE username = ?", senderUsername).Scan(&senderID)
+    if err != nil {
+        fmt.Println("Error getting sender ID:", err)
+        return
+    }
+
+    // Get receiver ID
+    err = database.DB.QueryRow("SELECT id FROM users WHERE username = ?", receiverUsername).Scan(&receiverID)
+    if err != nil {
+        fmt.Println("Error getting receiver ID:", err)
+        return
+    }
+
+    // Insert message into database
+    _, err = database.DB.Exec(`
+        INSERT INTO chats (sender_id, receiver_id, message) 
+        VALUES (?, ?, ?)`,
+        senderID, receiverID, content,
+    )
+    if err != nil {
+        fmt.Println("Error saving message:", err)
+    }
+}
+
 
 // Broadcast the list of online users
 func broadcastOnlineUsers() {
@@ -155,7 +187,79 @@ func sendPrivateMessage(msg Message) {
             break
         }
     }
+
+	for _, client := range clients {
+        if client.username == msg.Receiver || client.username == msg.Sender {
+            // Fetch updated chat history
+            messages, err := getChatHistory(msg.Sender, msg.Receiver)
+            if err != nil {
+                fmt.Println("Error fetching chat history:", err)
+                return
+            }
+
+            response := map[string]interface{}{
+                "type":     "chatHistory",
+                "messages": messages,
+            }
+
+            err = client.conn.WriteJSON(response)
+            if err != nil {
+                fmt.Println("Error sending private message:", err)
+                client.conn.Close()
+                delete(clients, client.conn)
+            }
+        }
+    }
 }
+
+func getChatHistory(senderUsername, receiverUsername string) ([]Message, error) {
+    var senderID, receiverID int
+
+    // Get sender ID
+    err := database.DB.QueryRow("SELECT id FROM users WHERE username = ?", senderUsername).Scan(&senderID)
+    if err != nil {
+        return nil, err
+    }
+
+    // Get receiver ID
+    err = database.DB.QueryRow("SELECT id FROM users WHERE username = ?", receiverUsername).Scan(&receiverID)
+    if err != nil {
+        return nil, err
+    }
+
+    // Fetch messages from the database
+    rows, err := database.DB.Query(`
+        SELECT sender_id, receiver_id, message, sent_at 
+        FROM chats 
+        WHERE (sender_id = ? AND receiver_id = ?) 
+        OR (sender_id = ? AND receiver_id = ?) 
+        ORDER BY sent_at ASC`, senderID, receiverID, receiverID, senderID)
+
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var messages []Message
+    for rows.Next() {
+        var msg Message
+        var senderID, receiverID int
+
+        err := rows.Scan(&senderID, &receiverID, &msg.Content, &msg.Timestamp)
+        if err != nil {
+            return nil, err
+        }
+
+        // Convert sender ID back to username
+        database.DB.QueryRow("SELECT username FROM users WHERE id = ?", senderID).Scan(&msg.Sender)
+        database.DB.QueryRow("SELECT username FROM users WHERE id = ?", receiverID).Scan(&msg.Receiver)
+
+        messages = append(messages, msg)
+    }
+
+    return messages, nil
+}
+
 
 
 func handleMessages() {

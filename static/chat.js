@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (data.type === "onlineUsers") {
             updateOnlineUsers(data.users);
+        } else if (data.type === "chatHistory") {
+            displayChatHistory(data.messages); // ✅ Show chat history            
         } else if (data.receiver) {
             displayPrivateMessage(
                 data.sender, 
@@ -24,6 +26,21 @@ document.addEventListener("DOMContentLoaded", function () {
             displayMessage(data.sender, data.content, data.timestamp);
         }
     };
+
+    // Function to display chat history
+    function displayChatHistory(messages) {
+    if (!messages || messages.length === 0) return;
+
+    const chatWith = messages[0].receiver === username ? messages[0].sender : messages[0].receiver;
+    let messageList = document.getElementById(`messages-${chatWith}`);
+    if (!messageList) return;
+
+    messageList.innerHTML = ""; // Clear old messages
+
+    messages.forEach(msg => {
+        displayPrivateMessage(msg.sender, msg.receiver, msg.content, msg.timestamp);
+    });
+    }
 
     socket.onclose = function () {
         console.log("Disconnected from WebSocket server");
@@ -81,7 +98,8 @@ document.addEventListener("DOMContentLoaded", function () {
     window.sendPrivateMessage = function (receiver, firstName, lastName) {
         const messageInput = document.getElementById(`input-${receiver}`);
         const message = messageInput.value.trim();
-
+        console.log(message);
+        
         if (message) {
             const data = {
                 sender: username,
