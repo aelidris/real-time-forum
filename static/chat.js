@@ -12,7 +12,14 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.type === "onlineUsers") {
             updateOnlineUsers(data.users);
         } else if (data.receiver) {
-            displayPrivateMessage(data.sender, data.receiver, data.content, data.timestamp);
+            displayPrivateMessage(
+                data.sender, 
+                data.receiver, 
+                data.content, 
+                data.timestamp,
+                data.firstName,  // ✅ Now passing first name
+                data.lastName    // ✅ Now passing last name
+            );
         } else {
             displayMessage(data.sender, data.content, data.timestamp);
         }
@@ -53,17 +60,25 @@ document.addEventListener("DOMContentLoaded", function () {
                 </div>
                 <ul class="chat-messages" id="messages-${username}"></ul>
                 <input type="text" id="input-${username}" placeholder="Type a message...">
-                <button onclick="sendPrivateMessage('${username}')">Send</button>
+                <button onclick="sendPrivateMessage('${username}', '${firstName}', '${lastName}')">Send</button>
             `;
 
             document.getElementById("chatContainer").appendChild(chatBox);
+
+            // Add event listener to send message when Enter is pressed
+            const messageInput = document.getElementById(`input-${username}`);
+            messageInput.addEventListener("keypress", function (event) {
+                if (event.key === "Enter") {
+                    sendPrivateMessage(username);
+                }
+            });
         }
 
         // Bring the chat box to the front if it already exists
         chatBox.style.display = "block";
     }
 
-    window.sendPrivateMessage = function (receiver) {
+    window.sendPrivateMessage = function (receiver, firstName, lastName) {
         const messageInput = document.getElementById(`input-${receiver}`);
         const message = messageInput.value.trim();
 
@@ -73,35 +88,42 @@ document.addEventListener("DOMContentLoaded", function () {
                 receiver: receiver,
                 content: message,
                 timestamp: new Date().toLocaleTimeString(),
+                firstName: firstName, // ✅ Include first name
+                lastName: lastName    // ✅ Include last name
             };
 
             // Send the message to the WebSocket server
             socket.send(JSON.stringify(data));
 
             // Display the message in the sender's own chat box immediately
-            displayPrivateMessage(username, receiver, message, data.timestamp);
+            displayPrivateMessage(username, receiver, message, data.timestamp, firstName, lastName);
 
             // Clear the input field
             messageInput.value = "";
         }
     };
 
-    function displayPrivateMessage(sender, receiver, content, timestamp) {
+    function displayPrivateMessage(sender, receiver, content, timestamp, firstName, lastName) {
         let chatWith = sender === username ? receiver : sender; // Choose correct chat box ID
         let chatBox = document.getElementById(`chat-${chatWith}`);
 
         if (!chatBox) {
-            openPrivateChat(chatWith, chatWith, "");
+            openPrivateChat(chatWith, firstName, lastName);
         }
 
         const messageList = document.getElementById(`messages-${chatWith}`);
         if (!messageList) return;
 
+        const displayName = sender === username ? "You" : `${firstName} ${lastName}`; // ✅ Use full name instead of username
+
         const messageElement = document.createElement("li");
-        messageElement.textContent = `[${timestamp}] ${sender}: ${content}`;
+        messageElement.textContent = `[${timestamp}] ${displayName}: ${content}`;
         messageElement.classList.add(sender === username ? "sent-message" : "received-message"); // Apply CSS classes
 
         messageList.appendChild(messageElement);
+
+        // Auto-scroll to the latest message
+        messageList.scrollTop = messageList.scrollHeight;
     }
 
     window.closeChat = function (username) {

@@ -20,6 +20,8 @@ type Message struct {
 	Receiver  string `json:"receiver"` // Added for private messaging
 	Content   string `json:"content"`
 	Timestamp string `json:"timestamp"`
+	SenderFirstName string `json:"firstName"`  // ✅ New field
+    SenderLastName  string `json:"lastName"`   // ✅ New field
 }
 
 // Define the Client struct
@@ -126,28 +128,59 @@ func broadcastOnlineUsers() {
 
 // Send a private message
 func sendPrivateMessage(msg Message) {
-	mu.Lock()
-	defer mu.Unlock()
+    mu.Lock()
+    defer mu.Unlock()
 
-	for _, client := range clients {
-		if client.username == msg.Receiver {
-			err := client.conn.WriteJSON(msg)
-			if err != nil {
-				fmt.Println("Error sending private message:", err)
-			}
-			break
-		}
-	}
+    var senderFirstName, senderLastName string
+
+    // Find the sender’s first and last name from the connected clients
+    for _, client := range clients {
+        if client.username == msg.Sender {
+            senderFirstName = client.firstName
+            senderLastName = client.lastName
+            break
+        }
+    }
+
+    // Add sender’s first and last name to the message
+    msg.SenderFirstName = senderFirstName
+    msg.SenderLastName = senderLastName
+
+    for _, client := range clients {
+        if client.username == msg.Receiver {
+            err := client.conn.WriteJSON(msg)
+            if err != nil {
+                fmt.Println("Error sending private message:", err)
+            }
+            break
+        }
+    }
 }
+
 
 func handleMessages() {
     for {
         msg := <-broadcast // Receive a message from the channel
 
+        var senderFirstName, senderLastName string
+
+        // Find sender’s first and last name
+        for _, client := range clients {
+            if client.username == msg.Sender {
+                senderFirstName = client.firstName
+                senderLastName = client.lastName
+                break
+            }
+        }
+
+        // Attach sender's first and last name to the message
+        msg.SenderFirstName = senderFirstName
+        msg.SenderLastName = senderLastName
+
         mu.Lock()
         for _, client := range clients {
             if msg.Receiver == "" {
-                // Public message - send to all connected clients
+                // Public message - send to all clients
                 err := client.conn.WriteJSON(msg)
                 if err != nil {
                     fmt.Println("Error sending public message:", err)
@@ -155,7 +188,7 @@ func handleMessages() {
                     delete(clients, client.conn)
                 }
             } else if client.username == msg.Receiver {
-                // Private message - send only to the specific receiver
+                // Private message - send only to the receiver
                 err := client.conn.WriteJSON(msg)
                 if err != nil {
                     fmt.Println("Error sending private message:", err)
@@ -167,6 +200,7 @@ func handleMessages() {
         mu.Unlock()
     }
 }
+
 
 
 
