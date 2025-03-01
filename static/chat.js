@@ -7,15 +7,14 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     socket.onmessage = function (event) {
-        const data = JSON.parse(event.data);
-
+        const data = JSON.parse(event.data);        
         if (data.type === "onlineUsers") {
             updateOnlineUsers(data.users);
         } else if (data.type === "notification") {            
             showNotification(data.sender);
         } else if (data.type === "chatHistory") {
-            displayChatHistory(data.messages); // ✅ Show chat history            
-        } else if (data.receiver) {
+            displayChatHistory(data.messages); // ✅ Show chat history                   
+        } else if (data.receiver) {       
             displayPrivateMessage(
                 data.sender, 
                 data.receiver, 
@@ -24,31 +23,40 @@ document.addEventListener("DOMContentLoaded", function () {
                 data.firstName,  // ✅ Now passing first name
                 data.lastName    // ✅ Now passing last name
             );
-        } else {
-            displayMessage(data.sender, data.content, data.timestamp);
-        }
+        } 
     };
 
-    function showNotification(senderUsername) {
-        alert("A new message received!");
+    function showNotification() {
+        // alert("A new message received!");
     }
     
     
 
     // Function to display chat history
     function displayChatHistory(messages) {
-    if (!messages || messages.length === 0) return;
-
-    const chatWith = messages[0].receiver === username ? messages[0].sender : messages[0].receiver;
-    let messageList = document.getElementById(`messages-${chatWith}`);
-    if (!messageList) return;
-
-    messageList.innerHTML = ""; // Clear old messages
-
-    messages.forEach(msg => {
-        displayPrivateMessage(msg.sender, msg.receiver, msg.content, msg.timestamp);
-    });
+        if (!messages || messages.length === 0) return;
+    
+        const chatWith = messages[0].receiver === username ? messages[0].sender : messages[0].receiver;
+        let messageList = document.getElementById(`messages-${chatWith}`);
+        if (!messageList) return;
+    
+        messageList.innerHTML = ""; // Clear old messages
+        
+        messages.forEach(msg => {
+            const displayName = msg.sender === username ? "You" : msg.sender; // Just show sender's username
+    
+            const messageElement = document.createElement("li");
+            messageElement.textContent = `[${msg.timestamp}] ${displayName}: ${msg.content}`;
+            messageElement.classList.add(msg.sender === username ? "sent-message" : "received-message"); // Apply CSS classes
+    
+            messageList.appendChild(messageElement);
+        });
+    
+        // Auto-scroll to the latest message
+        messageList.scrollTop = messageList.scrollHeight;
     }
+    
+    
 
     socket.onclose = function () {
         console.log("Disconnected from WebSocket server");
@@ -117,7 +125,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 firstName: firstName, // ✅ Include first name
                 lastName: lastName    // ✅ Include last name
             };
-
+            
             // Send the message to the WebSocket server
             socket.send(JSON.stringify(data));
 
@@ -131,8 +139,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function displayPrivateMessage(sender, receiver, content, timestamp, firstName, lastName) {
         let chatWith = sender === username ? receiver : sender; // Choose correct chat box ID
-        let chatBox = document.getElementById(`chat-${chatWith}`);
-
+        let chatBox = document.getElementById(`chat-${chatWith}`);        
         if (!chatBox) {
             openPrivateChat(chatWith, firstName, lastName);
         }
