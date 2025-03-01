@@ -178,19 +178,46 @@ func sendPrivateMessage(msg Message) {
     msg.SenderFirstName = senderFirstName
     msg.SenderLastName = senderLastName
 
+    // Send the message to the receiver
+    messageSent := false
     for _, client := range clients {
         if client.username == msg.Receiver {
             err := client.conn.WriteJSON(msg)
             if err != nil {
                 fmt.Println("Error sending private message:", err)
+            } else {
+                messageSent = true
             }
             break
         }
     }
 
-	for _, client := range clients {
+    // Send notification if the receiver is online
+    if messageSent {
+        for _, client := range clients {
+            if client.username == msg.Receiver {
+                notification := map[string]string{
+                    "type":    "notification",
+                    "message": "You have a new message from " + senderFirstName + " " + senderLastName,
+                }
+                err := client.conn.WriteJSON(notification)
+                if err != nil {
+                    fmt.Println("Error sending notification:", err)
+                }
+                break
+            }
+        }
+    } else {
+        // Store notification in database if user is offline
+        err := saveNotificationToDB(msg.Receiver, senderFirstName+" "+senderLastName)
+        if err != nil {
+            fmt.Println("Error storing notification:", err)
+        }
+    }
+
+    // Update chat history for both sender and receiver
+    for _, client := range clients {
         if client.username == msg.Receiver || client.username == msg.Sender {
-            // Fetch updated chat history
             messages, err := getChatHistory(msg.Sender, msg.Receiver)
             if err != nil {
                 fmt.Println("Error fetching chat history:", err)
@@ -204,13 +231,14 @@ func sendPrivateMessage(msg Message) {
 
             err = client.conn.WriteJSON(response)
             if err != nil {
-                fmt.Println("Error sending private message:", err)
+                fmt.Println("Error sending chat history:", err)
                 client.conn.Close()
                 delete(clients, client.conn)
             }
         }
     }
 }
+
 
 func getChatHistory(senderUsername, receiverUsername string) ([]Message, error) {
     var senderID, receiverID int
@@ -258,6 +286,11 @@ func getChatHistory(senderUsername, receiverUsername string) ([]Message, error) 
     }
 
     return messages, nil
+}
+func saveNotificationToDB(receiver, sender string) error {
+    _, err := database.DB.Exec("INSERT INTO notifications (receiver, message, seen) VALUES (?, ?, 0)",
+        receiver, "New message from "+sender)
+    return err
 }
 
 

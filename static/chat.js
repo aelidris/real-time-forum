@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (data.type === "onlineUsers") {
             updateOnlineUsers(data.users);
+        } else if (data.type === "notification") {            
+            showNotification(data.sender);
         } else if (data.type === "chatHistory") {
             displayChatHistory(data.messages); // ✅ Show chat history            
         } else if (data.receiver) {
@@ -26,6 +28,12 @@ document.addEventListener("DOMContentLoaded", function () {
             displayMessage(data.sender, data.content, data.timestamp);
         }
     };
+
+    function showNotification(senderUsername) {
+        alert("A new message received!");
+    }
+    
+    
 
     // Function to display chat history
     function displayChatHistory(messages) {
