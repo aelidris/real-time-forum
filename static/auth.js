@@ -142,7 +142,7 @@ document
       })
       .catch((error) => {
         console.error("Request error:", error);
-        alert("An error occurred.");
+        alert("the nickname or email are already exist!!");
       });
   });
 
