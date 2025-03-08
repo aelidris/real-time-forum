@@ -11,23 +11,48 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.type === "onlineUsers") {
             updateOnlineUsers(data.users);
         } else if (data.type === "notification") {            
-            showNotification(data.sender);
+            showNotification(data.sender); // Pass the sender's username
         } else if (data.type === "chatHistory") {
-            displayChatHistory(data.messages); // ✅ Show chat history                   
+            displayChatHistory(data.messages); //  Show chat history                   
         } else if (data.receiver) {       
             displayPrivateMessage(
                 data.sender, 
                 data.receiver, 
                 data.content, 
                 data.timestamp,
-                data.firstName,  // ✅ Now passing first name
-                data.lastName    // ✅ Now passing last name
+                data.firstName, 
+                data.lastName    
             );
-        } 
+        }
     };
 
-    function showNotification() {
-        // alert("A new message received!");
+    function showNotification(sender) {
+        // Find the user in the online users list
+        const userElement = document.querySelector(`.online-user[data-username="${sender}"]`);
+        
+        if (userElement) {
+            // Add a visual highlight to the user
+            
+            userElement.style.backgroundColor = "#ffeb3b"; // Yellow background for highlight
+            userElement.style.transition = "background-color 0.3s ease";
+    
+            // Add or update the unread message count badge
+            let badge = userElement.querySelector(".unread-badge");
+            if (!badge) {
+                badge = document.createElement("span");
+                badge.className = "unread-badge";
+                userElement.appendChild(badge);
+            }
+    
+            // Increment the unread message count
+            const currentCount = parseInt(badge.textContent) || 0;
+            badge.textContent = currentCount + 1;
+    
+            // Reset the highlight after a few seconds
+            setTimeout(() => {
+                userElement.style.backgroundColor = ""; // Reset background color
+            }, 3000); // 3 seconds
+        }
     }
     
     
@@ -80,7 +105,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function openPrivateChat(username, firstName, lastName) {
         let chatBox = document.getElementById(`chat-${username}`);
-
+    
         // If chat box does not exist, create a new one
         if (!chatBox) {
             chatBox = document.createElement("div");
@@ -95,9 +120,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 <input type="text" id="input-${username}" placeholder="Type a message...">
                 <button onclick="sendPrivateMessage('${username}', '${firstName}', '${lastName}')">Send</button>
             `;
-
+    
             document.getElementById("chatContainer").appendChild(chatBox);
-
+    
             // Add event listener to send message when Enter is pressed
             const messageInput = document.getElementById(`input-${username}`);
             messageInput.addEventListener("keypress", function (event) {
@@ -106,11 +131,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             });
         }
-
+    
         // Bring the chat box to the front if it already exists
         chatBox.style.display = "block";
+    
+        // Reset the unread message count and highlight
+        const userElement = document.querySelector(`.online-user[data-username="${username}"]`);
+        if (userElement) {
+            userElement.style.backgroundColor = ""; // Reset background color
+            const badge = userElement.querySelector(".unread-badge");
+            if (badge) {
+                badge.textContent = ""; // Clear the badge
+            }
+        }
     }
-
     window.sendPrivateMessage = function (receiver, firstName, lastName) {
         const messageInput = document.getElementById(`input-${receiver}`);
         const message = messageInput.value.trim();
