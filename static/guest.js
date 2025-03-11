@@ -1,89 +1,119 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const loginToggle = document.getElementById("loginToggle");
-  const authPopup = document.getElementById("authPopup");
-  const closePopup = document.getElementById("closePopup");
+  const authContainer = document.getElementById("authContainer");
+  const mainContent = document.getElementById("mainContent");
   const authTabs = document.querySelectorAll(".auth-tabs button");
-  const authForms = document.querySelectorAll(".auth-form");
-  const logoutButton = document.getElementById("logoutButton");
-  const createPostButton = document.getElementById("createPostButton");
   const postPopup = document.getElementById("postPopup");
   const closePostPopup = document.getElementById("closePostPopup");
+  const logoutButton = document.getElementById("logoutButton");
+  const createPostButton = document.getElementById("createPostButton");
 
-  function updateUI() {
-    const commentsSection = document.querySelectorAll(".comment-form");
-    const disableInteraction = document.querySelectorAll(".interaction-button:not(.comment-button)");
-
+  // Session management
+  function checkSession() {
     fetch("/check-session", {
       method: "GET",
-      credentials: "same-origin",
+      credentials: "same-origin"
     })
-      .then((response) => {
-        if (response.ok) return response.json();
-        return response.json().then(data => { throw new Error(data.message || "Unauthorized") });
-      })
-      .then((data) => {
-        if (data.loggedIn) {
-          console.log("User is logged in.");
-          commentsSection.forEach(section => section.style.display = "block");
-          createPostButton.style.display = "inline-block";
-          logoutButton.style.display = "inline-block";
-          loginToggle.style.display = "none";
-          disableInteraction.forEach(button => button.disabled = false);
-        } else {
-          console.log("User is not logged in.");
-          commentsSection.forEach(section => section.style.display = "none");
-          createPostButton.style.display = "none";
-          logoutButton.style.display = "none";
-          loginToggle.style.display = "inline-block";
-          disableInteraction.forEach(button => button.disabled = true);
-          postPopup.classList.remove("show");
-        }
-      })
-      .catch((error) => {
-        console.error("Session check failed:", error);
-        commentsSection.forEach(section => section.style.display = "none");
-        createPostButton.style.display = "none";
-        logoutButton.style.display = "none";
-        loginToggle.style.display = "inline-block";
-        disableInteraction.forEach(button => button.disabled = true);
-        postPopup.classList.remove("show");
-      });
+    .then(response => {
+      if (!response.ok) throw new Error("Session check failed");
+      return response.json();
+    })
+    .then(data => {
+      if (data.loggedIn) {
+        showMainContent();
+      } else {
+        showAuthForms();
+      }
+    })
+    .catch(error => {
+      console.error("Session error:", error);
+      showAuthForms();
+    });
   }
 
-  // MutationObserver for dynamic content
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach(mutation => {
-      if (mutation.type === 'childList') updateUI();
-    });
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+  function showMainContent() {
+    authContainer.style.display = "none";
+    mainContent.style.display = "block";
+    updateAuthenticatedUI(true);
+  }
 
-  // Initial UI update
-  updateUI();
+  function showAuthForms() {
+    authContainer.style.display = "flex";
+    mainContent.style.display = "none";
+    updateAuthenticatedUI(false);
+  }
 
-  // Auth popup controls
-  loginToggle.addEventListener("click", () => authPopup.classList.add("show"));
-  closePopup.addEventListener("click", () => authPopup.classList.remove("show"));
-  authPopup.addEventListener("click", (e) => {
-    if (e.target === authPopup) authPopup.classList.remove("show");
-  });
+  function updateAuthenticatedUI(isLoggedIn) {
+    const interactionButtons = document.querySelectorAll(".interaction-button:not(.comment-button)");
+    const commentForms = document.querySelectorAll(".comment-form");
+    
+    if (isLoggedIn) {
+      createPostButton.style.display = "inline-block";
+      logoutButton.style.display = "inline-block";
+      interactionButtons.forEach(btn => btn.disabled = false);
+      commentForms.forEach(form => form.style.display = "block");
+    } else {
+      createPostButton.style.display = "none";
+      logoutButton.style.display = "none";
+      interactionButtons.forEach(btn => btn.disabled = true);
+      commentForms.forEach(form => form.style.display = "none");
+    }
+  }
 
-  // Post popup controls
-  createPostButton.addEventListener("click", () => postPopup.classList.add("show"));
-  closePostPopup.addEventListener("click", () => postPopup.classList.remove("show"));
-  postPopup.addEventListener("click", (e) => {
-    if (e.target === postPopup) postPopup.classList.remove("show");
-  });
-
-  // Tab switching
+  // Auth tab switching
   authTabs.forEach(tab => {
     tab.addEventListener("click", () => {
       const formType = tab.dataset.form;
+      
+      // Update tabs
       authTabs.forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
-      authForms.forEach(form => {
-        form.classList.toggle("active", form.id === `${formType}Form`);
+      
+      // Update forms
+      document.querySelectorAll(".auth-form").forEach(form => {
+        form.classList.remove("active");
+        if (form.id === `${formType}Form`) {
+          form.classList.add("active");
+        }
       });
     });
   });
+
+  // Post popup controls
+  createPostButton.addEventListener("click", () => {
+    postPopup.classList.add("show");
+  });
+
+  closePostPopup.addEventListener("click", () => {
+    postPopup.classList.remove("show");
+  });
+
+  postPopup.addEventListener("click", (e) => {
+    if (e.target === postPopup) {
+      postPopup.classList.remove("show");
+    }
+  });
+
+  // Logout handler
+  logoutButton.addEventListener("click", () => {
+    fetch("/logout", {
+      method: "POST",
+      credentials: "include",
+    })
+    .then(response => {
+      if (response.ok) {
+        showAuthForms();
+        window.scrollTo(0, 0);
+      }
+    })
+    .catch(error => console.error("Logout failed:", error));
+  });
+
+  // Initial check
+  checkSession();
+
+  // Global auth success handler
+  window.handleAuthSuccess = () => {
+    checkSession();
+    window.scrollTo(0, 0);
+  };
 });
