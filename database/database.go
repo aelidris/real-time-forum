@@ -30,14 +30,14 @@ func createTables() error {
 	_, err := DB.Exec(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL ,
-            email TEXT UNIQUE NOT NULL ,
+            nickname TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-			session_token TEXT NOT NULL,
-        	age INTEGER,
-        	gender TEXT CHECK (gender IN ('Male', 'Female')),
-        	first_name TEXT,
-        	last_name TEXT,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            age INTEGER NOT NULL,
+            gender TEXT NOT NULL CHECK (gender IN ('Male', 'Female')),
+            session_token TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `)
@@ -48,6 +48,7 @@ func createTables() error {
 		log.Println("'users' table created or already exists")
 	}
 
+	// Rest of the tables remain the same
 	// Posts table
 	_, err = DB.Exec(`
         CREATE TABLE IF NOT EXISTS posts (
@@ -56,7 +57,7 @@ func createTables() error {
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (session_token) ON DELETE CASCADE
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         );
     `)
 	if err != nil {
@@ -116,17 +117,17 @@ func createTables() error {
 		log.Println("'comments' table created or already exists")
 	}
 
-	// post_Likes table
+	// post_likes table
 	_, err = DB.Exec(`
         CREATE TABLE IF NOT EXISTS post_likes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             post_id INTEGER NOT NULL,
-            is_like BOOLEAN NOT NULL,	
+            is_like BOOLEAN NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
             FOREIGN KEY (post_id) REFERENCES posts (id) ON DELETE CASCADE,
-			UNIQUE (user_id, post_id)
+            UNIQUE (user_id, post_id)
         );
     `)
 	if err != nil {
@@ -136,15 +137,15 @@ func createTables() error {
 		log.Println("'post_likes' table created or already exists")
 	}
 
-	// comment_Likes table
+	// comment_likes table
 	_, err = DB.Exec(`
         CREATE TABLE IF NOT EXISTS comment_likes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            comment_id INT NOT NULL,
+            comment_id INTEGER NOT NULL,
             is_like BOOLEAN NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(comment_id, user_id),
+            UNIQUE (comment_id, user_id),
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
             FOREIGN KEY (comment_id) REFERENCES comments (id) ON DELETE CASCADE
         );
@@ -158,13 +159,13 @@ func createTables() error {
 
 	// Insert default categories
 	_, err = DB.Exec(`
-        INSERT OR IGNORE INTO categories (name) VALUES 
+        INSERT OR IGNORE INTO categories (name) VALUES
         ('Technology'),
         ('Lifestyle'),
         ('Travel'),
         ('Food'),
-		('Sport'),
-		('Other')
+        ('Sport'),
+        ('Other')
     `)
 	if err != nil {
 		log.Printf("Error inserting default categories: %v", err)
@@ -172,25 +173,6 @@ func createTables() error {
 	} else {
 		log.Println("Default categories inserted or already exist")
 	}
-
-	// table using for the chat between users
-	_, err = DB.Exec(`
-    	CREATE TABLE IF NOT EXISTS chats (
-    	    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    	    sender_id INTEGER NOT NULL,
-    	    receiver_id INTEGER NOT NULL,
-    	    message TEXT NOT NULL,
-    	    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    	    FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
-    	    FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE
-    	);
-	`)
-	if err != nil {
-	    log.Printf("Error creating 'chats' table: %v", err)
-	    return err
-	} else {
-	    log.Println("'chats' table created or already exists")
-}
 
 	return nil
 }

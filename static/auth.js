@@ -1,153 +1,157 @@
-document.getElementById("logoutButton").addEventListener("click", () => {
-  fetch("/logout", {
+document.getElementById("loginForm").addEventListener("submit", function (event) {
+  event.preventDefault();
+  const errorElement = document.getElementById("loginMessage");
+  errorElement.textContent = "";
+  errorElement.style.display = "none";
+
+  const formData = new FormData(this);
+  const identifier = formData.get("email");
+  const password = formData.get("password");
+
+  if (!identifier || !password) {
+    showError(errorElement, "nickname/Email and password are required.");
+    return;
+  }
+
+  fetch("/login", {
     method: "POST",
-    credentials: "include", // Ensure cookies are sent
+    body: formData,
   })
-    .then((response) => {
-      if (response.ok) {
-        if (response.redirected) {
-          loadPosts();
-          window.location.href = response.url;
-        }
-      } else {
-        console.error("Logout failed with status:", response.status);
+    .then(handleResponse)
+    .then(data => {
+      if (data.message) {
+        this.reset();
+        window.handleAuthSuccess();
       }
-    });      
+    })
+    .catch(error => {
+      showError(errorElement, error.error || "Login failed. Please check your credentials.");
+    });
 });
-/************************************************** */
-document
-  .getElementById("loginForm")
-  .addEventListener("submit", function (event) {
-    event.preventDefault();
 
-    const email = document.getElementById("loginEmail").value;
-    const password = document.getElementById("loginPassword").value;
-    const errorElement = document.getElementById("loginMessage");
+document.getElementById("registerForm").addEventListener("submit", function (event) {
+  event.preventDefault();
+  clearErrors();
 
-    if (!email || !password) {
-      errorElement.textContent = "Email or Nickname and password are required.";
-      errorElement.style.display = "block";
+  const formData = new FormData(this);
+  const password = formData.get("password");
+  const confirmPassword = document.getElementById("confirmPassword").value;
+  const passwordError = document.getElementById("passwordError");
+
+  // Client-side validation
+  let isValid = true;
+
+  // Password match check
+  if (password !== confirmPassword) {
+    showError(passwordError, "Passwords do not match!");
+    isValid = false;
+  }
+
+  // Required fields check
+  const requiredFields = [
+    'nickname', 'email', 'first_name', 'last_name', 
+    'age', 'gender', 'password'
+  ];
+
+  requiredFields.forEach(field => {
+    const value = formData.get(field);
+    const inputId = `register${capitalize(field)}`;
+    const inputElement = document.getElementById(inputId);
+    
+    if (!inputElement) {
+      console.error(`Element not found: ${inputId}`);
       return;
-    } else {
-      errorElement.style.display = "none";
     }
 
-    const formData = new FormData(this);
+    const errorElement = inputElement.nextElementSibling;
+    if (!errorElement || !errorElement.classList.contains("error-message")) {
+      console.error(`Missing error element for: ${inputId}`);
+      return;
+    }
 
-    fetch("/login", {
-      method: "POST",
-      body: formData,
-    })
-      .then((response) => {
-        return response.json().then((data) => {
-          if (!response.ok) {
-            
-            throw data;
-          }
-          return data;
-        });
-      })
-      .then((data) => {
-        
-        // **Store session token in localStorage**
-        if (data.session_token) {
-          localStorage.setItem("session_token", data.session_token);
-        }
-        console.log("Storing session token:", data.session_token);
-        
-
-        alert(data.message);
-
-        // After successful login
-localStorage.setItem("username", data.username);
-
-
-        document.getElementById("loginForm").reset();
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 500);
-      })
-      .catch((error) => {
-        console.log("Error object:", error);
-
-        if (error && error.error) {
-          errorElement.textContent = error.error;
-          errorElement.style.display = "block";
-        } else {
-          alert("An unexpected error occurred. Check the console for details.");
-        }
-      });
+    if (!value?.trim()) {
+      showError(errorElement, "This field is required");
+      isValid = false;
+    }
   });
 
-/************************************* */
-document
-  .getElementById("registerForm")
-  .addEventListener("submit", function (event) {
-    event.preventDefault();
+  if (!isValid) return;
 
-    // Reset all error messages before new validation
-    document.querySelectorAll(".form-group small").forEach((element) => {
-      element.textContent = "";
-      element.style.display = "none";
-    });
-
-    const formData = new FormData(this);
-
-    // Extract form values
-    const password = document.getElementById("registerPassword").value;
-    const confirmPassword = document.getElementById("confirmPassword").value;
-    const errorElement = document.getElementById("passwordError");
-
-    if (password !== confirmPassword) {
-      errorElement.textContent = "Passwords do not match!";
-      errorElement.style.display = "block";
-      return;
-    }
-
-    // Convert FormData to an object for debugging
-    let formDataObject = {};
-    formData.forEach((value, key) => {
-      formDataObject[key] = value;
-    });
-
-    console.log("Form Data:", JSON.stringify(formDataObject)); // Debugging
-
-    fetch("/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams(formData).toString(),
+  fetch("/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(formData),
+  })
+    .then(handleResponse)
+    .then(data => {
+      if (data.message) {
+        this.reset();
+        document.getElementById("confirmPassword").value = "";
+        switchToLoginTab();
+        showSuccess("Registration successful! Please login.");
+      }
     })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.error === "Validation error" && data.fields) {
-          Object.entries(data.fields).forEach(([field, message]) => {
-            const fieldId = `register${capitalize(field)}`;
-            const errorElement = document.getElementById(fieldId)?.nextElementSibling;
-            
+    .catch(error => {
+      if (error.fields) {
+        Object.entries(error.fields).forEach(([field, message]) => {
+          const inputId = `register${capitalize(field)}`;
+          const inputElement = document.getElementById(inputId);
+          if (inputElement) {
+            const errorElement = inputElement.nextElementSibling;
             if (errorElement) {
-              errorElement.textContent = message;
-              errorElement.style.display = "block";
-            } else {
-              console.warn(`No error element found for ${fieldId}`);
+              showError(errorElement, message);
             }
-          });
-        } else if (data.error) {
-          alert(data.error);
-        } else {
-          alert(data.message);
-          this.reset();
-        }
-      })
-      .catch((error) => {
-        console.error("Request error:", error);
-        alert("the nickname or email are already exist!!");
-      });
-  });
+          }
+        });
+      } else {
+        showError(document.getElementById("passwordError"), error.error || "Registration failed. Please try again.");
+      }
+    });
+});
 
-function capitalize(string) {
-  return string.charAt(0).toUpperCase() + string.slice(1);
+function handleResponse(response) {
+  return response.json().then(data => {
+    if (!response.ok) throw data;
+    return data;
+  });
 }
 
-/****************************************** */
+function clearErrors() {
+  document.querySelectorAll(".error-message").forEach(el => {
+    el.textContent = "";
+    el.style.display = "none";
+  });
+}
+
+function showError(element, message) {
+  if (!element) return;
+  element.textContent = message;
+  element.style.display = "block";
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function showSuccess(message) {
+  const successElement = document.createElement("div");
+  successElement.className = "auth-message success";
+  successElement.textContent = message;
+  
+  const authHeader = document.querySelector(".auth-header");
+  authHeader.insertAdjacentElement("afterend", successElement);
+  
+  setTimeout(() => successElement.remove(), 3000);
+}
+
+function switchToLoginTab() {
+  document.querySelectorAll(".auth-tabs button").forEach(tab => {
+    if (tab.dataset.form === "login") {
+      tab.click();
+    }
+  });
+}
+
+function capitalize(string) {
+  return string
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
+}
