@@ -12,122 +12,138 @@
   <title>Forum</title>
   <link rel="icon" type="image/x-icon" href="/static/forum_icon.png">
   <link rel="stylesheet" href="/static/style.css" />
+  <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </head>
 
 <body>
-  <section>
+  <!-- Auth Container (Visible by default) -->
+  <div class="auth-main-container" id="authContainer">
+    <div class="auth-wrapper">
+      <div class="auth-header">
+        <h1>Welcome to Forum</h1>
+        <p>Please login or register to continue</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="active" data-form="login">
+          <ion-icon name="log-in-outline"></ion-icon>
+          Login
+        </button>
+        <button data-form="register">
+          <ion-icon name="person-add-outline"></ion-icon>
+          Register
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="loginForm" class="auth-form active">
+        <div class="form-group">
+          <label for="loginIdentifier">Nickname or Email</label>
+          <input type="text" id="loginIdentifier" name="email" 
+                 placeholder="Enter nickname or email" required />
+        </div>
+        <div class="form-group password-wrapper">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" name="password" 
+                 placeholder="Enter your password" required />
+          <button type="button" class="password-toggle" onclick="togglePassword('loginPassword')">
+            <ion-icon name="eye-off-outline"></ion-icon>
+          </button>
+        </div>
+        <button type="submit">
+          <ion-icon name="log-in-outline"></ion-icon>
+          Login
+        </button>
+      </form>
+      <div id="loginMessage" class="auth-message"></div>
+
+      <!-- Registration Form -->
+      <form id="registerForm" class="auth-form">
+        <div class="form-group">
+          <label for="registerNickname">Nickname</label>
+          <input type="text" id="registerNickname" name="nickname" 
+                 placeholder="Choose a unique username" required />
+          <small class="error-message"></small>
+        </div>
+        <div class="form-group">
+          <label for="registerEmail">Email</label>
+          <input type="email" id="registerEmail" name="email" 
+                 placeholder="your.email@example.com" required />
+          <small class="error-message"></small>
+        </div>
+        <div class="form-group">
+          <label for="registerFirstName">First Name</label>
+          <input type="text" id="registerFirstName" name="first_name" 
+                 placeholder="Enter your first name" required />
+          <small class="error-message"></small>
+        </div>
+        <div class="form-group">
+          <label for="registerLastName">Last Name</label>
+          <input type="text" id="registerLastName" name="last_name" 
+                 placeholder="Enter your last name" required />
+          <small class="error-message"></small>
+        </div>
+        <div class="form-group">
+          <label for="registerAge">Age</label>
+          <input type="number" id="registerAge" name="age" 
+                 placeholder="Enter your age" required min="0" max="150" />
+          <small class="error-message"></small>
+        </div>
+        <div class="form-group">
+          <label for="registerGender">Gender</label>
+          <select id="registerGender" name="gender" required>
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          <small class="error-message"></small>
+        </div>
+        <div class="form-group password-wrapper">
+          <label for="registerPassword">Password</label>
+          <input type="password" id="registerPassword" name="password" 
+                 placeholder="Create a password" required />
+          <small class="error-message"></small>
+          <button type="button" class="password-toggle" onclick="togglePassword('registerPassword')">
+            <ion-icon name="eye-off-outline"></ion-icon>
+          </button>
+        </div>
+        <div class="form-group password-wrapper">
+          <label for="confirmPassword">Confirm Password</label>
+          <input type="password" id="confirmPassword" 
+                 placeholder="Confirm your password" required />
+          <button type="button" class="password-toggle" onclick="togglePassword('confirmPassword')">
+            <ion-icon name="eye-off-outline"></ion-icon>
+          </button>
+          <small id="passwordError" class="error-message"></small>
+        </div>
+        <button type="submit">
+          <ion-icon name="person-add-outline"></ion-icon>
+          Register
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Content (Hidden initially) -->
+  <div class="main-content" id="mainContent" style="display: none;">
     <header class="header">
       <div class="header-content">
         <a href="#" class="logo">FORUM</a>
         <div class="auth-icon">
-          <button id="createPostButton" style="display: none">📝 Create Post</button>
-          <button id="logoutButton" style="display: none">🚪 Logout</button>
-          <button id="loginToggle" style="display: inline-block">
-            🔑 Login
+          <button id="createPostButton">
+            <ion-icon name="create-outline"></ion-icon>
+            Create Post
+          </button>
+          <button id="logoutButton">
+            <ion-icon name="log-out-outline"></ion-icon>
+            Logout
           </button>
         </div>
       </div>
     </header>
-  </section>
-  <section>
-    <main class="main-content">
 
-
-
-
-      <aside class="online-users">
-        <h3>Online Users</h3>
-        <ul id="onlineUserList">
-            <!-- Users will be inserted dynamically here -->
-        </ul>
-    </aside>
-    
-    <!-- Private chat boxes will be dynamically added here -->
-    <div id="chatContainer"></div>
-
- 
-     
-    
-      
-
-
-
-
-      <!-- Login/Registration Popup -->
-      <div class="auth-popup" id="authPopup">
-        <div class="auth-container">
-          <button class="close-popup" id="closePopup">&times;</button>
-
-          <div class="auth-tabs">
-            <button class="active" data-form="login">Login</button>
-            <button data-form="register">Register</button>
-          </div>
-
-          <!-- Login Form -->
-          <form id="loginForm" class="auth-form active">
-            <div class="form-group">
-              <label for="loginEmail">Email</label>
-              <input id="loginEmail" name="email" required />
-            </div>
-            <div class="form-group">
-              <label for="loginPassword">Password</label>
-              <input type="password" id="loginPassword" name="password" required />
-            </div>
-            <button type="submit">Login</button>
-          </form>
-          <div id="loginMessage" style="display: none; color: red"></div>
-
-          <!-- Registration Form -->
-          <form id="registerForm" class="auth-form">
-            <div class="form-group">
-              <label for="registerNickname">Nickname</label>
-              <input type="text" id="registerNickname" name="nickname" required />
-              <small style="color: red; display: none"></small>
-            </div>
-            <div class="form-group">
-              <label for="registerEmail">Email</label>
-              <input type="email" id="registerEmail" name="email" required />
-              <small style="color: red; display: none"></small>
-            </div>
-            <div class="form-group">
-              <label for="registerFirstName">First Name</label>
-              <input type="text" id="registerFirstName" name="first_name" required />
-              <small style="color: red; display: none"></small>
-            </div>
-            <div class="form-group">
-              <label for="registerLastName">Last Name</label>
-              <input type="text" id="registerLastName" name="last_name" required />
-              <small style="color: red; display: none"></small>
-            </div>
-            <div class="form-group">
-              <label for="registerAge">Age</label>
-              <input type="number" id="registerAge" name="age" required min="0" max="150" />
-              <small style="color: red; display: none"></small>
-            </div>
-            <div class="form-group">
-              <label for="registerGender">Gender</label>
-              <select id="registerGender" name="gender" required>
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-              <small style="color: red; display: none"></small>
-            </div>
-            <div class="form-group">
-              <label for="registerPassword">Password</label>
-              <input type="password" id="registerPassword" name="password" required />
-              <small style="color: red; display: none"></small>
-            </div>
-            <div class="form-group">
-              <label for="confirmPassword">Confirm Password</label>
-              <input type="password" id="confirmPassword" required />
-              <small id="passwordError" style="color: red; display: none">Passwords do not match.</small>
-            </div>
-            <button type="submit">Register</button>
-          </form>
-        </div>
-      </div>
-
+    <main class="container">
       <!-- Create Post Popup -->
       <div class="post-popup" id="postPopup">
         <div class="post-container">
@@ -136,62 +152,51 @@
           <form class="post-form" id="postForm">
             <div class="form-group">
               <label for="postTitle">Title</label>
-              <input type="text" id="postTitle" name="title" maxlength="100" required />
+              <input type="text" id="postTitle" name="title" 
+                     placeholder="Enter post title" required />
             </div>
             <div class="form-group">
               <label for="postContent">Content</label>
-              <textarea id="postContent" name="content" maxlength="1000" required></textarea>
+              <textarea id="postContent" name="content" 
+                        placeholder="Write your post content here..." required></textarea>
             </div>
             <div class="form-group">
               <label>Categories:</label>
               <div class="category-checkboxes"></div>
             </div>
-            <button type="submit">Create Post</button>
+            <button type="submit">
+              <ion-icon name="create-outline"></ion-icon>
+              Create Post
+            </button>
           </form>
         </div>
       </div>
 
-      <!-- Main Content -->
-      <div class="container">
-        <!-- Filters -->
-        <div class="filter-container">
-          <label for="categoryFilter">Filter by Category:</label>
-          <select id="categoryFilter">
-            <option value="all">All Posts</option>
-          </select>
-        </div>
-
-        <div class="filter-container" id="ownershipFilterContainer">
-          <label for="ownershipFilter">Filter by Posts:</label>
-          <select id="ownershipFilter">
-            <option value="all">All Posts</option>
-            <option value="my_posts">My Posts</option>
-            <option value="liked_posts">Liked Posts</option>
-          </select>
-        </div>
-
-        <!-- Posts Container -->
-        <div id="allPosts"></div>
-        <button id="loadMoreBtn" style="display: none">Load More</button>
-
-        <noscript>
-          <div class="noscript-message">
-            <p>
-              JavaScript is disabled in your browser. Please enable JavaScript
-              to view the posts.
-            </p>
-          </div>
-        </noscript>
+      <!-- Category Filter -->
+      <div class="filter-container">
+        <label for="categoryFilter">Filter by Category:</label>
+        <select id="categoryFilter">
+          <option value="all">All Posts</option>
+        </select>
       </div>
-    </main>
-  </section>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="footer-bottom">
-      <p>&copy; 2025 FORUM. All rights reserved.</p>
-    </div>
-  </footer>
+      <!-- Posts Container -->
+      <div id="allPosts"></div>
+      <button id="loadMoreBtn" style="display: none">
+        <ion-icon name="arrow-down-circle-outline"></ion-icon>
+        Load More
+      </button>
+
+      <noscript>
+        <div class="noscript-message">
+          <p>
+            JavaScript is disabled in your browser. Please enable JavaScript
+            to view the posts.
+          </p>
+        </div>
+      </noscript>
+    </main>
+  </div>
 
   <!-- Scripts -->
   <script src="/static/guest.js"></script>
@@ -200,8 +205,21 @@
   <script src="/static/interactions.js"></script>
   <script src="/static/posts.js"></script>
   <script src="/static/categories.js"></script>
-  <script src="/static/chat.js"></script>
-
+  <script>
+    function togglePassword(fieldId) {
+      const passwordField = document.getElementById(fieldId);
+      const toggleButton = passwordField.parentNode.querySelector('.password-toggle');
+      const icon = toggleButton.querySelector('ion-icon');
+      
+      if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        icon.name = 'eye-outline';
+      } else {
+        passwordField.type = 'password';
+        icon.name = 'eye-off-outline';
+      }
+    }
+  </script>
 </body>
 
 </html>

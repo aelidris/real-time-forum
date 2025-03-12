@@ -18,6 +18,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// Unchanged HomePage handler
 func HomePage(w http.ResponseWriter, r *http.Request) {
 	response := make(map[string]interface{})
 
@@ -56,6 +57,7 @@ func HomePage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Updated ShowPosts handler
 func ShowPosts(w http.ResponseWriter, r *http.Request) {
 	response := make(map[string]interface{})
 
@@ -66,53 +68,31 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	UName, sessionToken, _, err := auth.RequireLogin(w, r)
+	_, sessionToken, _, err := auth.RequireLogin(w, r)
 	if err != nil {
 		response["error"] = "Unauthorized access. Please log in."
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
+
 	category := r.URL.Query().Get("category")
-	ownership := r.URL.Query().Get("ownership")
 	var postStmt string
 	var postRows *sql.Rows
 
-	if ownership == "my_posts" {
-		postStmt = `
-				SELECT p.id, p.title, p.content
-				FROM Posts p
-				INNER JOIN users u ON p.user_id = u.id
-				WHERE u.session_token = ?
-				ORDER BY p.created_at DESC
-			`
-		postRows, err = database.DB.Query(postStmt, sessionToken)
-
-	} else if ownership == "liked_posts" {
-		postStmt = `
-				SELECT p.id, p.title, p.content
-				FROM Posts p
-				INNER JOIN post_likes pl ON p.id = pl.post_id
-				INNER JOIN users u ON pl.user_id = u.id
-				WHERE u.session_token = ? AND pl.is_like = true
-				ORDER BY p.created_at DESC
-			`
-		postRows, err = database.DB.Query(postStmt, sessionToken)
+	if category == "all" || category == "" {
+		postStmt = "SELECT id, title, content, created_at FROM Posts ORDER BY created_at DESC"
+		postRows, err = database.DB.Query(postStmt)
 	} else {
-		if category == "all" || category == "" {
-			postStmt = "SELECT id, title, content FROM Posts ORDER BY created_at DESC"
-			postRows, err = database.DB.Query(postStmt)
-		} else {
-			postStmt = `
-				SELECT p.id, p.title, p.content
-				FROM Posts p
-				INNER JOIN post_categories pc ON p.id = pc.post_id
-				INNER JOIN categories c ON pc.category_id = c.id
-				WHERE c.name = ?
-				ORDER BY p.created_at DESC
-			`
-			postRows, err = database.DB.Query(postStmt, category)
-		}
+		postStmt = `
+			SELECT p.id, p.title, p.content, p.created_at
+			FROM Posts p
+			INNER JOIN post_categories pc ON p.id = pc.post_id
+			INNER JOIN categories c ON pc.category_id = c.id
+			WHERE c.name = ?
+			ORDER BY p.created_at DESC
+		`
+		postRows, err = database.DB.Query(postStmt, category)
 	}
 
 	if err != nil {
@@ -127,13 +107,17 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 		var p models.Post
 		var postWithLike models.PostWithLike
 		var postID int
-		err = postRows.Scan(&postID, &p.Title, &p.Content)
+		var createdAt time.Time
+		err = postRows.Scan(&postID, &p.Title, &p.Content, &createdAt)
 		if err != nil {
 			log.Printf("Error scanning post: %v", err)
 			continue
 		}
+		p.PostID = postID
+		p.CreatedAt = createdAt
+
 		var userID int
-		userIdStmt := "SELECT user_id from posts WHERE id = ?"
+		userIdStmt := "SELECT user_id FROM posts WHERE id = ?"
 		err = database.DB.QueryRow(userIdStmt, postID).Scan(&userID)
 		if err != nil {
 			response["error"] = "Unauthorized access. Please log in."
@@ -141,39 +125,26 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(response)
 			return
 		}
-		authorStmt := "SELECT username from users WHERE id = ?"
+
+		authorStmt := "SELECT nickname FROM users WHERE id = ?"
 		err = database.DB.QueryRow(authorStmt, userID).Scan(&p.Author)
 		if err != nil {
-			response["error"] = "Unauthorized access. Please log in."
+			response["error"] = "Failed to get author information."
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(response)
 			return
 		}
 
-		/*****/
 		if sessionToken != "guest" {
-			var userID int
-			// var sessionToken string
-			err = database.DB.QueryRow("SELECT id FROM users WHERE username = ? AND session_token = ?", UName, sessionToken).Scan(&userID)
-			if err != nil {
-				response["error"] = "Unauthorized access. Please log in."
-				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(response)
-				return
-			}
-			// Retrieve like status for the current post
 			var isLike sql.NullBool
-
 			err = database.DB.QueryRow(`
-			SELECT is_like FROM post_likes 
-			WHERE post_id = ? AND user_id = ?
-		`, postID, userID).Scan(&isLike)
-
+				SELECT is_like FROM post_likes
+				WHERE post_id = ? AND user_id = ?
+			`, postID, userID).Scan(&isLike)
 			if err != nil && err != sql.ErrNoRows {
 				log.Printf("Error retrieving like status for post %d: %v", postID, err)
 				continue
 			}
-			// Set IsLike based on the query result
 			if isLike.Valid {
 				if isLike.Bool {
 					postWithLike.IsLike = 1
@@ -185,25 +156,23 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		/***********/
-		// Retrieve like and dislike counts for the current post
 		err = database.DB.QueryRow(`
-		 SELECT 
-			 COUNT(CASE WHEN is_like = true THEN 1 END) AS like_count,
-			 COUNT(CASE WHEN is_like = false THEN 1 END) AS dislike_count
-		 FROM post_likes
-		 WHERE post_id = ?
-	 `, postID).Scan(&postWithLike.LikeCount, &postWithLike.DislikeCount)
+			SELECT
+				COUNT(CASE WHEN is_like = true THEN 1 END) AS like_count,
+				COUNT(CASE WHEN is_like = false THEN 1 END) AS dislike_count
+			FROM post_likes
+			WHERE post_id = ?
+		`, postID).Scan(&postWithLike.LikeCount, &postWithLike.DislikeCount)
 		if err != nil {
 			log.Printf("Error retrieving like/dislike counts for post %d: %v", postID, err)
 			continue
 		}
 
 		catStmt := `
-				SELECT c.name
-				FROM categories c
-				INNER JOIN post_categories pc ON c.id = pc.category_id
-				WHERE pc.post_id = ?`
+			SELECT c.name
+			FROM categories c
+			INNER JOIN post_categories pc ON c.id = pc.category_id
+			WHERE pc.post_id = ?`
 		catRows, err := database.DB.Query(catStmt, postID)
 		if err != nil {
 			log.Printf("Error querying categories for post %d: %v", postID, err)
@@ -228,7 +197,6 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 		}
 
 		p.Categories = categories
-		p.PostID = postID
 		p.Comments = comments
 
 		postWithLike.Post = p
@@ -252,8 +220,9 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Updated PostSubmit handler
 func PostSubmit(w http.ResponseWriter, r *http.Request) {
-	username, sessionToken, loggedIn, _ := auth.RequireLogin(w, r)
+	nickname, sessionToken, loggedIn, _ := auth.RequireLogin(w, r) // Changed variable name
 	response := make(map[string]interface{})
 
 	if !loggedIn {
@@ -299,9 +268,9 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//        check if the user exists
 	var exists bool
-	err := database.DB.QueryRow("SELECT EXISTS (SELECT 1 FROM users WHERE username = ?)", username).Scan(&exists)
+	// Changed from username to nickname
+	err := database.DB.QueryRow("SELECT EXISTS (SELECT 1 FROM users WHERE nickname = ?)", nickname).Scan(&exists)
 	if err != nil {
 		log.Printf("Error checking user existence: %v", err)
 		response["error"] = "Failed to validate user."
@@ -317,15 +286,14 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check the time of the last post
 	var lastPostTime time.Time
 	err = database.DB.QueryRow(`
-		  SELECT created_at
-		  FROM Posts
-		  WHERE user_id = (SELECT id FROM users WHERE session_token = ?)
-		  ORDER BY created_at DESC
-		  LIMIT 1
-	  `, sessionToken).Scan(&lastPostTime)
+		SELECT created_at
+		FROM Posts
+		WHERE user_id = (SELECT id FROM users WHERE session_token = ?)
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, sessionToken).Scan(&lastPostTime)
 
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error checking last post time: %v", err)
@@ -340,7 +308,7 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 		const postCooldown = 1 * time.Second
 		if timeSinceLastPost < postCooldown {
 			response["error"] = fmt.Sprintf(
-				"You can only create a post every 1 seconds. Please wait %d seconds.",
+				"You can only create a post every 1 second. Please wait %d seconds.",
 				int(postCooldown.Seconds()-timeSinceLastPost.Seconds()),
 			)
 			w.WriteHeader(http.StatusBadRequest)
@@ -348,8 +316,6 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	//    transaction
 
 	tx, err := database.DB.Begin()
 	if err != nil {
@@ -361,12 +327,11 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	insertPostQuery := `
-        INSERT INTO Posts (user_id, title, content, created_at)
-        SELECT id, ?, ?, ? FROM users WHERE session_token = ?
-    `
+		INSERT INTO Posts (user_id, title, content, created_at)
+		SELECT id, ?, ?, ? FROM users WHERE session_token = ?
+	`
 	result, err := tx.Exec(insertPostQuery, title, content, time.Now(), sessionToken)
 	if err != nil {
-
 		log.Printf("Error inserting post: %v", err)
 		response["error"] = "Failed to submit post."
 		w.WriteHeader(http.StatusInternalServerError)
@@ -375,7 +340,6 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the ID of the newly inserted post
 	postID, err := result.LastInsertId()
 	if err != nil {
 		log.Printf("Error retrieving post ID: %v", err)
@@ -386,9 +350,7 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// insert post-category relationships
 	for _, categoryName := range categoryNames {
-
 		var categoryID int
 		err := tx.QueryRow("SELECT id FROM categories WHERE name = ?", categoryName).Scan(&categoryID)
 		if err == sql.ErrNoRows {
@@ -407,9 +369,9 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 
 		insertPostCategoryQuery := `
-            INSERT INTO post_categories (post_id, category_id)
-            VALUES (?, ?)
-        `
+			INSERT INTO post_categories (post_id, category_id)
+			VALUES (?, ?)
+		`
 		_, err = tx.Exec(insertPostCategoryQuery, postID, categoryID)
 		if err != nil {
 			log.Printf("Error inserting post-category link: %v", err)

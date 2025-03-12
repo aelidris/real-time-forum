@@ -1,129 +1,84 @@
 document.getElementById("postForm").addEventListener("submit", function (event) {
   event.preventDefault();
+  const errorElement = document.getElementById("postError") || document.createElement("div");
+  
+  // Clear previous errors
+  errorElement.textContent = "";
+  errorElement.style.display = "none";
 
-  // Check if at least one category is selected
-  const selectedCategories = document.querySelectorAll(
-    'input[name="category"]:checked'
-  );
+  const selectedCategories = document.querySelectorAll('input[name="category"]:checked');
   if (selectedCategories.length === 0) {
-    alert("Please select at least one category.");
+    showPostError("Please select at least one category.");
     return;
   }
 
   const formData = new FormData(this);
-  // console.log("post form data", formData);
-
 
   fetch("/post_submit", {
     method: "POST",
     body: formData,
   })
-    .then(async (response) => {
-      if (!response.ok) {
-        return response.json().then((data) => {
-          throw new Error(data.error || "An unknown error occurred.");
-        });
-      }
-      return response.json();
-    })
-    .then(() => {
-      // alert("Post submitted successfully!");
-      postsPerPage = 5;
-      loadPosts();
-      this.reset();
-
-       // Close the post popup after successful submission
-       document.getElementById("postPopup").classList.remove("show");
-       
-    })
-    .catch((error) => {
-      console.error("Error:", error);
-      alert(error.message || "An error occurred while submitting the post.");
-    });
+  .then(async (response) => {
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Post submission failed");
+    return data;
+  })
+  .then(() => {
+    postsPerPage = 5;
+    loadPosts();
+    this.reset();
+    document.getElementById("postPopup").classList.remove("show");
+  })
+  .catch((error) => {
+    showPostError(error.message);
+    console.error("Post error:", error);
+  });
 });
 
-/******************************************** */
-
 let currentIndex = 0;
-var postsPerPage = 5;
+let postsPerPage = 5;
 let selectedCategory = null;
-let selectedOwnership = null;
 let allPosts = [];
 
 async function loadPosts() {
   try {
-
     const params = new URLSearchParams();
-
-    if (selectedCategory && selectedCategory !== 'all') {
-      params.append('category', selectedCategory);
-    }
-
-    if (selectedOwnership && selectedOwnership !== 'all') {
-      params.append('ownership', selectedOwnership);
-    }
+    if (selectedCategory && selectedCategory !== 'all') params.append('category', selectedCategory);
 
     const response = await fetch(`/show_posts?${params.toString()}`);
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      // throw new Error("Failed to fetch data");
-      throw new Error(errorData.error || "Failed to fetch data");
-    }
-
-    // const contentType = response.headers.get("content-type");
-    // if (!contentType || !contentType.includes("application/json")) {
-    //   throw new Error("Expected JSON, but got HTML");
-    // }
+    if (!response.ok) throw new Error(await response.text());
 
     allPosts = await response.json();
-    // console.log(allPosts);
-
     const allPostsContainer = document.getElementById("allPosts");
-    if (!allPostsContainer) {
-      console.error("Element with id 'allPosts' not found!");
-      return;
-    }
-
-    if (allPosts.length === 0) {
-      allPostsContainer.innerHTML = `
-      // <p style = "color:red"; >No posts found.</p>`;
-      allPostsContainer.innerHTML = `
-      <div style="
-        padding: 20px; 
-        margin: 20px;
-        background-color: #ffecec; 
-        color: #d8000c; 
-        border: 1px solid #d8000c; 
-        border-radius: 5px; 
-        text-align: center;
-      ">
-        <strong>Error:</strong> No posts found.
-      </div>
-    `;
-
-      return;
-    }
-
+    
     allPostsContainer.innerHTML = "";
     currentIndex = 0;
+    
+    if (allPosts.length === 0) {
+      allPostsContainer.innerHTML = `
+        <div class="info-message">
+          <strong>No posts found</strong>
+        </div>
+      `;
+      return;
+    }
+
     loadMorePosts();
   } catch (error) {
-    console.error("Error loading posts:", error);
-    // console.log("test")
-    // console.log("error" ,error)
-    console.error("Failed to load posts test: " + error.message);
+    document.getElementById("allPosts").innerHTML = `
+      <div class="error-message">
+        Error loading posts: ${error.message}
+      </div>
+    `;
+    console.error("Load posts error:", error);
   }
 }
+
 function loadMorePosts() {
   const allPostsContainer = document.getElementById("allPosts");
   const loadMoreBtn = document.getElementById("loadMoreBtn");
 
-  for (
-    let i = currentIndex;
-    i < currentIndex + postsPerPage && i < allPosts.length;
-    i++
-  ) {
+  for (let i = currentIndex; i < currentIndex + postsPerPage && i < allPosts.length; i++) {
     try {
       const postElement = createPostElement(allPosts[i]);
       allPostsContainer.appendChild(postElement);
@@ -133,251 +88,123 @@ function loadMorePosts() {
   }
 
   currentIndex += postsPerPage;
-
-  if (currentIndex >= allPosts.length) {
-    loadMoreBtn.style.display = "none";
-  } else {
-    loadMoreBtn.style.display = "block";
-  }
+  loadMoreBtn.style.display = currentIndex >= allPosts.length ? "none" : "block";
 }
 
 document.getElementById("loadMoreBtn").addEventListener("click", loadMorePosts);
 
-loadPosts();
-
-//   create a post element
 function createPostElement(postData) {
-  // console.log(postData);
-
   const postDiv = document.createElement("div");
   postDiv.classList.add(`post${postData.PostID}`, "post");
 
-  // Handle null Comments gracefully
-  const commentCount = Array.isArray(postData.Comments)
-    ? postData.Comments.length
-    : 0;
-
+  const timeAgo = formatTimeAgo(new Date(postData.CreatedAt));
+  const commentCount = Array.isArray(postData.Comments) ? postData.Comments.length : 0;
 
   postDiv.innerHTML = `
-      <div class="post-header"> 
-      <img src="./static/profile.png" width="36" height="36" border-radius=18px alt="user-pic">
-      <h4 class="author">${postData.Author}</h4>
+    <div class="post-header">
+      <img src="/static/profile.png" width="36" height="36" class="post-avatar" alt="user avatar">
+      <div class="author-time-container">
+        <span class="author">${postData.Author}</span>
+        <span class="post-time">${timeAgo}</span>
       </div>
-      <h2 class="post-title">${postData.Title}</h2>
-      <div class="post-categories">
-        ${postData.Categories.map(
-    (cat) => `<span class="category-tag">${cat}</span>`
-  ).join("")}
-      </div>
-      <div class="post-content">${postData.Content}</div>
-
-      <div class="stats">
-      <span id="like${postData.PostID}">${postData.LikeCount}</span> likes · 
-      <span id="dislikes${postData.PostID}">${postData.DislikeCount}</span> dislikes 
-      </div>
-
-      <div class="interaction-bar">
-        <button id="post-like-btn-${postData.PostID
-    }" class="interaction-button ${postData.IsLike === 1 ? "active" : ""}"
-          onclick="submitLikeDislike({ postID: '${postData.PostID
-    }', isLike: true })">👍 Like</button>
-        <button id="post-dislike-btn-${postData.PostID
-    }" class="interaction-button ${postData.IsLike === 2 ? "active" : ""}"
-          onclick="submitLikeDislike({ postID: '${postData.PostID
-    }', isLike: false })">👎 Dislike</button>
-        <button class="interaction-button comment-button" onclick="toggleComments('${postData.PostID
-    }')">
-          💬 Comments (${commentCount})
-        </button>
-      </div>
-      <div class="comments-section" id="comments-${postData.PostID
-    }" style="display: none;">
-        <form class="comment-form"  style="display : block" id="commentForm-${postData.PostID
-    }" onsubmit="submitComment(event, ${postData.PostID})">
-          <input type="hidden" name="post_id" value="${postData.PostID}">
-          <textarea placeholder="Write a comment..." name="comment" required></textarea>
-          <button type="submit">Add Comment</button>
-        </form>
-        ${commentCount > 0
-      ? postData.Comments.map(
-        (comment) => `
+    </div>
+    <h2 class="post-title">${postData.Title}</h2>
+    <div class="post-categories">
+      ${postData.Categories.map(cat => `<span class="category-tag">${cat}</span>`).join("")}
+    </div>
+    <div class="post-content">${postData.Content}</div>
+    <div class="stats">
+      <span id="like${postData.PostID}">${postData.LikeCount}</span> likes ·
+      <span id="dislikes${postData.PostID}">${postData.DislikeCount}</span> dislikes
+    </div>
+    <div class="interaction-bar">
+      <button id="post-like-btn-${postData.PostID}" class="interaction-button ${postData.IsLike === 1 ? "active" : ""}"
+        onclick="submitLikeDislike({ postID: '${postData.PostID}', isLike: true })">
+        <ion-icon name="thumbs-up-outline"></ion-icon>
+        <span>Like</span>
+      </button>
+      <button id="post-dislike-btn-${postData.PostID}" class="interaction-button ${postData.IsLike === 2 ? "active" : ""}"
+        onclick="submitLikeDislike({ postID: '${postData.PostID}', isLike: false })">
+        <ion-icon name="thumbs-down-outline"></ion-icon>
+        <span>Dislike</span>
+      </button>
+      <button class="interaction-button comment-button" onclick="toggleComments('${postData.PostID}')">
+        <ion-icon name="chatbubble-outline"></ion-icon>
+        <span>Comments (${commentCount})</span>
+      </button>
+    </div>
+    <div class="comments-section" id="comments-${postData.PostID}" style="display: none;">
+      <form class="comment-form" id="commentForm-${postData.PostID}" onsubmit="submitComment(event, ${postData.PostID})">
+        <input type="hidden" name="post_id" value="${postData.PostID}">
+        <textarea placeholder="Write a comment..." name="comment" required></textarea>
+        <button type="submit">Add Comment</button>
+      </form>
+      ${commentCount > 0 ? postData.Comments.map(comment => `
         <div class="comment">
-          <div class="comment-content">${comment.Content}</div>
-
-          <div class="stats">
-          <span id="likecomment${comment.CommentID}">${comment.LikeCount}</span> likes · 
-          <span id="dislikescomment${comment.CommentID}">${comment.DislikeCount}</span> dislikes
+          <div class="comment-header">
+            <img src="/static/profile.png" width="32" height="32" class="comment-avatar">
+            <div class="author-time-container">
+              <span class="comment-author">${comment.Author}</span>
+              <span class="comment-time">${formatTimeAgo(new Date(comment.CreatedAt))}</span>
+            </div>
           </div>
-          
+          <div class="comment-content">${comment.Content}</div>
+          <div class="stats">
+            <span id="likecomment${comment.CommentID}">${comment.LikeCount}</span> likes ·
+            <span id="dislikescomment${comment.CommentID}">${comment.DislikeCount}</span> dislikes
+          </div>
           <div class="interaction-bar">
-          <button id="comment-like-btn-${comment.CommentID
-          }" class="interaction-button ${comment.IsLike === 1 ? "active" : ""
-          }"
-          onclick="submitLikeDislike({ commentID: '${comment.CommentID
-          }', isLike: true })">👍 Like</button>
-        <button id="comment-dislike-btn-${comment.CommentID
-          }" class="interaction-button ${comment.IsLike === 2 ? "active" : ""}"
-          onclick="submitLikeDislike({ commentID: '${comment.CommentID
-          }', isLike: false })">👎 Dislike</button>
-                </div>
+            <button id="comment-like-btn-${comment.CommentID}" class="interaction-button ${comment.IsLike === 1 ? "active" : ""}"
+              onclick="submitLikeDislike({ commentID: '${comment.CommentID}', isLike: true })">
+              <ion-icon name="thumbs-up-outline"></ion-icon>
+              <span>Like</span>
+            </button>
+            <button id="comment-dislike-btn-${comment.CommentID}" class="interaction-button ${comment.IsLike === 2 ? "active" : ""}"
+              onclick="submitLikeDislike({ commentID: '${comment.CommentID}', isLike: false })">
+              <ion-icon name="thumbs-down-outline"></ion-icon>
+              <span>Dislike</span>
+            </button>
+          </div>
         </div>
-      `
-      ).join("")
-      : "<p>No comments yet.</p>"
-    }
-      </div>
-    `;
+      `).join("") : "<p>No comments yet.</p>"}
+    </div>
+  `;
 
   return postDiv;
 }
 
+function formatTimeAgo(date) {
+  const now = new Date();
+  const diff = now - date;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ago`;
+  if (hours > 0) return `${hours}h ago`;
+  if (minutes > 0) return `${minutes}m ago`;
+  if (seconds > 10) return `${seconds}s ago`;
+  return "just now";
+}
+
 document.getElementById("categoryFilter").addEventListener("change", function () {
   selectedCategory = this.value === "all" ? null : this.value;
-  selectedOwnership = this.value === null;
-  const categoy = document.getElementById("ownershipFilter")
-  categoy.value = "all";
   postsPerPage = 5;
   loadPosts();
-  console.log("selectedCategory", selectedCategory);
-
 });
 
-document.getElementById("ownershipFilter").addEventListener("change", function () {
-  selectedOwnership = this.value === "all" ? null : this.value;
-  selectedCategory = this.value === null;
-  const categoy = document.getElementById("categoryFilter")
-  categoy.value = "all";
-  postsPerPage = 5;
-  loadPosts();
-  console.log("selectedOwnership", selectedOwnership);
-
-});
-
-async function filterPostsByOwnership(ownership) {
-  try {
-    const response = await fetch(`/show_posts?ownership=${ownership}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const posts = await response.json();
-
-    const allPostsContainer = document.getElementById("allPosts");
-    if (!allPostsContainer) {
-      console.error("Element with id 'allPosts' not found!");
-      return;
-    }
-
-    allPostsContainer.innerHTML = "";
-
-    if (posts.length === 0) {
-      console.log("No posts found for the selected posts.");
-      // allPostsContainer.innerHTML = "<p>No posts found.</p>";
-      allPostsContainer.innerHTML = `
-      <div style="
-        padding: 20px; 
-        background-color: #ffecec; 
-        color: #d8000c; 
-        border: 1px solid #d8000c; 
-        border-radius: 5px; 
-        text-align: center;
-      ">
-        <strong>Error:</strong> No posts found.
-      </div>
-    `;
-
-      return;
-    }
-
-    posts.forEach((post) => {
-      const postElement = createPostElement(post);
-      allPostsContainer.appendChild(postElement);
-    });
-
-    allPosts = [];
-    currentIndex = 0;
-    loadMorePosts();
-
-  } catch (error) {
-    console.error("Error filtering:", error);
-    alert("failed to filter posts.");
-  }
+function showPostError(message) {
+  const errorContainer = document.getElementById("postError") || createErrorContainer();
+  errorContainer.textContent = message;
+  errorContainer.style.display = "block";
+  errorContainer.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-
-async function filterPostsByCategory(category) {
-  try {
-    const response = await fetch(`/show_posts?category=${category}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const posts = await response.json();
-
-    const allPostsContainer = document.getElementById("allPosts");
-    if (!allPostsContainer) {
-      console.error("Element with id 'allPosts' not found!");
-      return;
-    }
-    // console.log(category);
-
-
-    allPostsContainer.innerHTML = "";
-
-    if (posts.length === 0) {
-      console.log("No posts found for the selected category.");
-      allPostsContainer.innerHTML = `
-      <style>
-      p{
-      color: red;
-      }
-      </style>
-      <p>No posts found for the selected category.</p>`
-      return;
-    }
-
-    posts.forEach((post) => {
-      const postElement = createPostElement(post);
-      allPostsContainer.appendChild(postElement);
-    });
-
-
-    allPosts = [];
-    currentIndex = 0;
-    loadMorePosts();
-
-  } catch (error) {
-    console.error("Error filtering posts by category:", error);
-    alert("Failed to filter posts by category.");
-  }
+function createErrorContainer() {
+  const container = document.createElement("div");
+  container.id = "postError";
+  container.className = "error-message";
+  document.querySelector(".post-form").prepend(container);
+  return container;
 }
-
-document.addEventListener("DOMContentLoaded", () => {
-  const ownershipFilterContainer = document.getElementById("ownershipFilterContainer");
-
-
-  fetch("/check-session", {
-    method: "GET",
-    credentials: "same-origin",
-  })
-    .then((response) => {
-      if (response.ok) {
-        return response.json();
-      } else {
-        throw new Error("Failed to check session");
-      }
-    })
-    .then((data) => {
-      if (!data.loggedIn) {
-        ownershipFilterContainer.style.display = "none";
-      } else {
-        ownershipFilterContainer.style.display = "block";
-      }
-    })
-    .catch((error) => {
-      console.error("Error checking session:", error);
-      ownershipFilterContainer.style.display = "none";
-    });
-});
-
-
