@@ -164,6 +164,25 @@
       </div>
 
     <main class="container">
+      <!-- Chat Container (Hidden by Default) -->
+      <div class="chat-container" id="chatContainer" style="display: none;">
+        <div class="chat-header">
+          <h3>Chat with <span id="chatUserName"></span></h3>
+          <button id="closeChatButton">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <!-- Chat messages will be dynamically added here -->
+        </div>
+        <div class="chat-input">
+          <input type="text" id="chatInput" placeholder="Type a message..." />
+          <button id="sendMessageButton">
+            <ion-icon name="send-outline"></ion-icon>
+          </button>
+        </div>
+      </div>
+
       <!-- Create Post Popup -->
       <div class="post-popup" id="postPopup">
         <div class="post-container">
@@ -192,12 +211,14 @@
         </div>
       </div>
 
+      <!-- Posts and Filter Container (Visible by Default) -->
+      <div id="postsAndFilterContainer">
       <!-- Category Filter -->
       <div class="filter-container">
-        <label for="categoryFilter">Filter by Category:</label>
-        <select id="categoryFilter">
-          <option value="all">All Posts</option>
-        </select>
+      <label for="categoryFilter">Filter by Category:</label>
+      <select id="categoryFilter">
+        <option value="all">All Posts</option>
+      </select>
       </div>
 
       <!-- Posts Container -->
@@ -219,6 +240,8 @@
   </div>
 
   <!-- Scripts -->
+  <script src="/static/chat.js"></script>
+
   <script src="/static/guest.js"></script>
   <script src="/static/auth.js"></script>
   <script src="/static/comments.js"></script>
