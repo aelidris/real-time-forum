@@ -15,6 +15,58 @@ body {
   flex-direction: column;
 }
 
+/* Sidebar Styles */
+.content-wrapper {
+  display: flex;
+  flex: 1;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #2c3e50;
+  color: white;
+  padding: 1rem;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-header {
+  margin-bottom: 1.5rem;
+}
+
+.sidebar-header h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.contacts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.contact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.contact:hover {
+  background-color: #34495e;
+}
+
+.contact ion-icon {
+  font-size: 1.5rem;
+}
+
+.contact span {
+  font-size: 1rem;
+}
+
+
 /* New Auth Container Styles */
 .auth-main-container {
   display: flex;
@@ -202,8 +254,9 @@ a, button, input, textarea {
 }
 
 .container {
-  max-width: 800px;
-  margin: 0 auto;
+  flex: 1;
+  max-width: calc(100% - 250px);
+  margin: 0;
   padding: 2rem 1rem;
 }
 
