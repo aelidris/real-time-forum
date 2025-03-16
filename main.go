@@ -31,6 +31,9 @@ func main() {
 	http.HandleFunc("/logout", auth.LogoutHandler)
 	http.HandleFunc("/register", auth.RegisterHandler)
 
+	// Add the new route for fetching users
+	http.HandleFunc("/api/users", handlers.GetUsers)
+
 	fmt.Println("http://localhost:8000/")
 	err := http.ListenAndServe(":8000", nil)
 	if err != nil {
