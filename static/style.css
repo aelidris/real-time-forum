@@ -18,7 +18,6 @@ body {
 /* Sidebar Styles */
 .content-wrapper {
   display: flex;
-  flex: 1;
 }
 
 .sidebar {
@@ -27,6 +26,10 @@ body {
   color: white;
   padding: 1rem;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  position: sticky; /* Make the sidebar sticky */
+  top: 0; /* Stick to the top of the viewport */
+  height: 100vh; /* Full viewport height */
+  overflow-y: auto; /* Enable scrolling if content overflows */
 }
 
 .sidebar-header {
@@ -348,10 +351,9 @@ a, button, input, textarea {
 }
 
 .container {
-  flex: 1;
-  max-width: calc(100% - 250px);
-  margin: 0;
+  flex: 1; /* Take up remaining space */
   padding: 2rem 1rem;
+  overflow-y: auto; /* Enable scrolling for the main content */
 }
 
 .post-form {
