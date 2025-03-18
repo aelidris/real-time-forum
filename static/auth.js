@@ -23,6 +23,10 @@ document.getElementById("loginForm").addEventListener("submit", function (event)
         this.reset();
         window.handleAuthSuccess();
       }
+              // After successful login
+localStorage.setItem("nickname", data.nickname);
+console.log(data.nickname);
+
     })
     .catch(error => {
       showError(errorElement, error.error || "Login failed. Please check your credentials.");

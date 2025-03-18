@@ -143,36 +143,23 @@
       </div>
     </header>
 
-    <div class="content-wrapper">
-      <!-- Sidebar for Contacts -->
-      <div class="sidebar">
-        <div class="sidebar-header">
-          <h3>Contacts</h3>
-        </div>
-        <div class="contacts-list">
-          <!-- Contacts will be dynamically added here by JavaScript -->
-        </div>
-      </div>
+    
 
     <main class="container">
-      <!-- Chat Container (Hidden by Default) -->
-      <div class="chat-container" id="chatContainer" style="display: none;">
-        <div class="chat-header">
-          <h3>Chat with <span id="chatUserName"></span></h3>
-          <button id="closeChatButton">
-            <ion-icon name="close-outline"></ion-icon>
-          </button>
-        </div>
-        <div class="chat-messages" id="chatMessages">
-          <!-- Chat messages will be dynamically added here -->
-        </div>
-        <div class="chat-input">
-          <input type="text" id="chatInput" placeholder="Type a message..." />
-          <button id="sendMessageButton">
-            <ion-icon name="send-outline"></ion-icon>
-          </button>
-        </div>
-      </div>
+
+
+      <aside class="online-users">
+        <h3>Online Users</h3>
+        <ul id="onlineUserList">
+            <!-- Users will be inserted dynamically here -->
+        </ul>
+    </aside>
+    
+    <!-- Private chat boxes will be dynamically added here -->
+    <div id="chatContainer"></div>
+
+
+      
 
       <!-- Create Post Popup -->
       <div class="post-popup" id="postPopup">

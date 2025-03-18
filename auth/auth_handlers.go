@@ -1,20 +1,20 @@
 package auth
 
 import (
-    "database/sql"
-    "encoding/json"
-    "fmt"
-    "log"
-    "net/http"
-    "strings"
-    "strconv"
-    "time"
-    
-    "github.com/gofrs/uuid/v5"
-    "golang.org/x/crypto/bcrypt"
-    
-    "forum/database"
-    "forum/utils"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gofrs/uuid/v5"
+	"golang.org/x/crypto/bcrypt"
+
+	"forum/database"
+	"forum/utils"
 )
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +55,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		lowerIdentifier,
 		identifier,
 	).Scan(&userID, &storedPassword, &sessionToken, &nickname)
-	
 	if err != nil {
 		if err == sql.ErrNoRows {
 			response := map[string]string{"error": "Invalid nickname/email or password"}
@@ -151,11 +150,11 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	var existingNickname, existingEmail string
 	err = database.DB.QueryRow(
-		"SELECT nickname, email FROM users WHERE email = ? OR nickname = ?", 
-		email, 
+		"SELECT nickname, email FROM users WHERE email = ? OR nickname = ?",
+		email,
 		nickname,
 	).Scan(&existingNickname, &existingEmail)
-	
+
 	if err == nil {
 		var conflictField, conflictMessage string
 		if existingNickname == nickname {
@@ -167,7 +166,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		response = map[string]string{
-			"error": conflictMessage, 
+			"error": conflictMessage,
 			"field": conflictField,
 		}
 		w.WriteHeader(http.StatusConflict)
@@ -191,7 +190,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	sessionToken, _ := uuid.NewV4()
 
-	_, err = database.DB.Exec(
+	result, err := database.DB.Exec(
 		"INSERT INTO users (nickname, email, password, first_name, last_name, age, gender, session_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		nickname,
 		email,
@@ -207,6 +206,26 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		response = map[string]string{"error": "Registration failed"}
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	// Get the last inserted user ID
+	userID, err := result.LastInsertId()
+	if err != nil {
+		log.Printf("Error retrieving last insert ID: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Add the user to the chats table (if needed)
+	_, err = database.DB.Exec(`
+		INSERT INTO chats (sender_id, receiver_id, message, sent_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		userID, 0, "Welcome to the chat!") // Assuming receiver_id 0 is for system messages
+	if err != nil {
+		log.Printf("Error inserting user into chat table: %v", err)
+		response = map[string]string{"error": "Chat registration failed"}
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
