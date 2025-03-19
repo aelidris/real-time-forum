@@ -348,7 +348,6 @@ func main() {
 	http.HandleFunc("/comment_submit", handlers.CommentSubmit)
 	http.HandleFunc("/interact", handlers.HandleInteract)
 	http.HandleFunc("/get_categories", handlers.GetCategories)
-	// http.HandleFunc("/api/online-users", handlers.GetOnlineUsersHandler)
 	http.HandleFunc("/login", auth.LoginHandler)
 	http.HandleFunc("/check-session", auth.CheckSessionHandler)
 	http.HandleFunc("/logout", auth.LogoutHandler)

@@ -48,7 +48,6 @@ func createTables() error {
 		log.Println("'users' table created or already exists")
 	}
 
-
 	// Rest of the tables remain the same
 	// Posts table
 	_, err = DB.Exec(`
@@ -188,11 +187,11 @@ func createTables() error {
     	);
 	`)
 	if err != nil {
-	    log.Printf("Error creating 'chats' table: %v", err)
-	    return err
+		log.Printf("Error creating 'chats' table: %v", err)
+		return err
 	} else {
-	    log.Println("'chats' table created or already exists")
-}
+		log.Println("'chats' table created or already exists")
+	}
 
 	return nil
 }
