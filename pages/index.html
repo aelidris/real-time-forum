@@ -126,41 +126,37 @@
   </div>
 
   <!-- Main Content (Hidden initially) -->
-  <div class="main-content" id="mainContent" style="display: none;">
-    <header class="header">
-      <div class="header-content">
-        <a href="#" class="logo">FORUM</a>
-        <div class="auth-icon">
-          <button id="createPostButton">
-            <ion-icon name="create-outline"></ion-icon>
-            Create Post
-          </button>
-          <button id="logoutButton">
-            <ion-icon name="log-out-outline"></ion-icon>
-            Logout
-          </button>
-        </div>
+  <!-- Main Content (Hidden initially) -->
+<div class="main-content" id="mainContent" style="display: none;">
+  <!-- Header (Outside the main-content container) -->
+  <header class="header">
+    <div class="header-content">
+      <a href="#" class="logo">FORUM</a>
+      <div class="auth-icon">
+        <button id="createPostButton">
+          <ion-icon name="create-outline"></ion-icon>
+          Create Post
+        </button>
+        <button id="logoutButton">
+          <ion-icon name="log-out-outline"></ion-icon>
+          Logout
+        </button>
       </div>
-    </header>
+    </div>
+  </header>
 
-    
-
-    <main class="container">
-
-
-      <aside class="online-users">
-        <h3>Online Users</h3>
-        <ul id="onlineUserList">
-            <!-- Users will be inserted dynamically here -->
-        </ul>
+  <!-- Main Layout (Contacts and Posts) -->
+  <div class="content-wrapper">
+    <!-- Contacts (Online Users) -->
+    <aside class="online-users">
+      <h3>Online Users</h3>
+      <ul id="onlineUserList">
+        <!-- Users will be inserted dynamically here -->
+      </ul>
     </aside>
-    
-    <!-- Private chat boxes will be dynamically added here -->
-    <div id="chatContainer"></div>
 
-
-      
-
+    <!-- Posts Container -->
+    <main class="container">
       <!-- Create Post Popup -->
       <div class="post-popup" id="postPopup">
         <div class="post-container">
@@ -169,13 +165,11 @@
           <form class="post-form" id="postForm">
             <div class="form-group">
               <label for="postTitle">Title</label>
-              <input type="text" id="postTitle" name="title" 
-                     placeholder="Enter post title" required />
+              <input type="text" id="postTitle" name="title" placeholder="Enter post title" required />
             </div>
             <div class="form-group">
               <label for="postContent">Content</label>
-              <textarea id="postContent" name="content" 
-                        placeholder="Write your post content here..." required></textarea>
+              <textarea id="postContent" name="content" placeholder="Write your post content here..." required></textarea>
             </div>
             <div class="form-group">
               <label>Categories:</label>
@@ -189,33 +183,38 @@
         </div>
       </div>
 
-      <!-- Posts and Filter Container (Visible by Default) -->
+      <!-- Posts and Filter Container -->
       <div id="postsAndFilterContainer">
-      <!-- Category Filter -->
-      <div class="filter-container">
-      <label for="categoryFilter">Filter by Category:</label>
-      <select id="categoryFilter">
-        <option value="all">All Posts</option>
-      </select>
-      </div>
-
-      <!-- Posts Container -->
-      <div id="allPosts"></div>
-      <button id="loadMoreBtn" style="display: none">
-        <ion-icon name="arrow-down-circle-outline"></ion-icon>
-        Load More
-      </button>
-
-      <noscript>
-        <div class="noscript-message">
-          <p>
-            JavaScript is disabled in your browser. Please enable JavaScript
-            to view the posts.
-          </p>
+        <!-- Category Filter -->
+        <div class="filter-container">
+          <label for="categoryFilter">Filter by Category:</label>
+          <select id="categoryFilter">
+            <option value="all">All Posts</option>
+          </select>
         </div>
-      </noscript>
+
+        <!-- Posts Container -->
+        <div id="allPosts"></div>
+        <button id="loadMoreBtn" style="display: none">
+          <ion-icon name="arrow-down-circle-outline"></ion-icon>
+          Load More
+        </button>
+
+        <noscript>
+          <div class="noscript-message">
+            <p>
+              JavaScript is disabled in your browser. Please enable JavaScript
+              to view the posts.
+            </p>
+          </div>
+        </noscript>
+      </div>
     </main>
   </div>
+
+  <!-- Private Chat Boxes (Dynamically Added) -->
+  <div id="chatContainer"></div>
+</div>
 
   <!-- Scripts -->
   <script src="/static/chat.js"></script>

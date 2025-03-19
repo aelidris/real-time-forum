@@ -12,8 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const data = JSON.parse(event.data);        
       if (data.type === "onlineUsers") {
         console.log("heeeeeeeeere");
-        
-          updateOnlineUsers(data.users);
+        updateOnlineUsers(data.users);
       } else if (data.type === "notification") {            
           showNotification(data.sender); // Pass the sender's nickname
       } else if (data.type === "chatHistory") {
