@@ -1,205 +1,131 @@
-document.addEventListener("DOMContentLoaded", function () {
-  const nickname = localStorage.getItem("nickname") || "Guest";
-  console.log("heeeeeeeeeeer", nickname);
+document.addEventListener("DOMContentLoaded", () => {
+    const nickname = localStorage.getItem("nickname") || "Guest";
+    const socket = new WebSocket(`ws://localhost:8080/ws?nickname=${nickname}`);
   
-  const socket = new WebSocket(`ws://localhost:8080/ws?nickname=${nickname}`);
-
-  socket.onopen = function () {
-      console.log("Connected to WebSocket server");
-  };
-
-  socket.onmessage = function (event) {
-      const data = JSON.parse(event.data);        
-      if (data.type === "onlineUsers") {
-        console.log("heeeeeeeeere");
-        updateOnlineUsers(data.users);
-      } else if (data.type === "notification") {            
-          showNotification(data.sender); // Pass the sender's nickname
-      } else if (data.type === "chatHistory") {
-          displayChatHistory(data.messages); //  Show chat history                   
-      } else if (data.receiver) {       
-          displayPrivateMessage(
-              data.sender, 
-              data.receiver, 
-              data.content, 
-              data.timestamp,
-              data.firstName, 
-              data.lastName    
-          );
+    socket.onopen = () => console.log("Connected to WebSocket server");
+    socket.onclose = () => console.log("Disconnected from WebSocket server");
+  
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      switch (data.type) {
+        case "onlineUsers":
+          updateOnlineUsers(data.users);
+          break;
+        case "notification":
+          showNotification(data.sender);
+          break;
+        case "chatHistory":
+          displayChatHistory(data.messages);
+          break;
+        default:
+          if (data.receiver) {
+            displayPrivateMessage(data);
+          }
       }
-  };
-
-  function showNotification(sender) {
-      // Find the user in the online users list
+    };
+  
+    const showNotification = (sender) => {
       const userElement = document.querySelector(`.online-user[data-nickname="${sender}"]`);
-      
       if (userElement) {
-          // Add a visual highlight to the user
-          
-          userElement.style.backgroundColor = "#ffeb3b"; // Yellow background for highlight
-          userElement.style.transition = "background-color 0.3s ease";
+        userElement.style.backgroundColor = "#ffeb3b";
+        userElement.style.transition = "background-color 0.3s ease";
   
-          // Add or update the unread message count badge
-          let badge = userElement.querySelector(".unread-badge");
-          if (!badge) {
-              badge = document.createElement("span");
-              badge.className = "unread-badge";
-              userElement.appendChild(badge);
-          }
+        let badge = userElement.querySelector(".unread-badge") || document.createElement("span");
+        badge.className = "unread-badge";
+        badge.textContent = (parseInt(badge.textContent) || 0) + 1;
+        userElement.appendChild(badge);
   
-          // Increment the unread message count
-          const currentCount = parseInt(badge.textContent) || 0;
-          badge.textContent = currentCount + 1;
-  
-          // Reset the highlight after a few seconds
-          setTimeout(() => {
-              userElement.style.backgroundColor = ""; // Reset background color
-          }, 3000); // 3 seconds
+        setTimeout(() => userElement.style.backgroundColor = "", 3000);
       }
-  }
+    };
   
-  
-
-  // Function to display chat history
-  function displayChatHistory(messages) {
-      if (!messages || messages.length === 0) return;
-  
+    const displayChatHistory = (messages) => {
+      if (!messages?.length) return;
       const chatWith = messages[0].receiver === nickname ? messages[0].sender : messages[0].receiver;
-      let messageList = document.getElementById(`messages-${chatWith}`);
-      if (!messageList) return;
-  
-      messageList.innerHTML = ""; // Clear old messages
-      
-      messages.forEach(msg => {
-          const displayName = msg.sender === nickname ? "You" : msg.sender; // Just show sender's nickname
-  
-          const messageElement = document.createElement("li");
-          messageElement.textContent = `[${msg.timestamp}] ${displayName}: ${msg.content}`;
-          messageElement.classList.add(msg.sender === nickname ? "sent-message" : "received-message"); // Apply CSS classes
-  
-          messageList.appendChild(messageElement);
-      });
-  
-      // Auto-scroll to the latest message
-      messageList.scrollTop = messageList.scrollHeight;
-  }
-  
-  
-
-  socket.onclose = function () {
-      console.log("Disconnected from WebSocket server");
-  };
-
-  function updateOnlineUsers(users) {
-      const userList = document.getElementById("onlineUserList");
-      userList.innerHTML = ""; // Clear existing list
-
-      users.forEach((user) => {
-          if (user.nickname !== nickname) { // Don't show current user
-              const userElement = document.createElement("li");
-              userElement.textContent = `${user.firstName} ${user.lastName}`;
-              userElement.dataset.nickname = user.nickname;
-              userElement.classList.add("online-user"); // Apply CSS class
-              userElement.addEventListener("click", () => openPrivateChat(user.nickname, user.firstName, user.lastName));
-              userList.appendChild(userElement);
-          }
-      });
-  }
-
-  function openPrivateChat(nickname, firstName, lastName) {
-      let chatBox = document.getElementById(`chat-${nickname}`);
-  
-      // If chat box does not exist, create a new one
-      if (!chatBox) {
-          chatBox = document.createElement("div");
-          chatBox.id = `chat-${nickname}`;
-          chatBox.className = "private-chat";
-          chatBox.innerHTML = `
-              <div class="chat-header">
-                  <h4>Chat with ${firstName} ${lastName}</h4>
-                  <button class="close-chat" onclick="closeChat('${nickname}')">×</button>
-              </div>
-              <ul class="chat-messages" id="messages-${nickname}"></ul>
-              <input type="text" id="input-${nickname}" placeholder="Type a message...">
-              <button onclick="sendPrivateMessage('${nickname}', '${firstName}', '${lastName}')">Send</button>
-          `;
-  
-          document.getElementById("chatContainer").appendChild(chatBox);
-  
-          // Add event listener to send message when Enter is pressed
-          const messageInput = document.getElementById(`input-${nickname}`);
-          messageInput.addEventListener("keypress", function (event) {
-              if (event.key === "Enter") {
-                  sendPrivateMessage(nickname);
-              }
-          });
-      }
-  
-      // Bring the chat box to the front if it already exists
-      chatBox.style.display = "block";
-  
-      // Reset the unread message count and highlight
-      const userElement = document.querySelector(`.online-user[data-nickname="${nickname}"]`);
-      if (userElement) {
-          userElement.style.backgroundColor = ""; // Reset background color
-          const badge = userElement.querySelector(".unread-badge");
-          if (badge) {
-              badge.textContent = ""; // Clear the badge
-          }
-      }
-  }
-  window.sendPrivateMessage = function (receiver, firstName, lastName) {
-      const messageInput = document.getElementById(`input-${receiver}`);
-      const message = messageInput.value.trim();
-      console.log(message);
-      
-      if (message) {
-          const data = {
-              sender: nickname,
-              receiver: receiver,
-              content: message,
-              timestamp: new Date().toLocaleTimeString(),
-              firstName: firstName, // ✅ Include first name
-              lastName: lastName    // ✅ Include last name
-          };
-          
-          // Send the message to the WebSocket server
-          socket.send(JSON.stringify(data));
-
-          // Display the message in the sender's own chat box immediately
-          displayPrivateMessage(nickname, receiver, message, data.timestamp, firstName, lastName);
-
-          // Clear the input field
-          messageInput.value = "";
-      }
-  };
-
-  function displayPrivateMessage(sender, receiver, content, timestamp, firstName, lastName) {
-      let chatWith = sender === nickname ? receiver : sender; // Choose correct chat box ID
-      let chatBox = document.getElementById(`chat-${chatWith}`);        
-      if (!chatBox) {
-          openPrivateChat(chatWith, firstName, lastName);
-      }
-
       const messageList = document.getElementById(`messages-${chatWith}`);
       if (!messageList) return;
-
-      const displayName = sender === nickname ? "You" : `${firstName} ${lastName}`; // ✅ Use full name instead of nickname
-
-      const messageElement = document.createElement("li");
-      messageElement.textContent = `[${timestamp}] ${displayName}: ${content}`;
-      messageElement.classList.add(sender === nickname ? "sent-message" : "received-message"); // Apply CSS classes
-
-      messageList.appendChild(messageElement);
-
-      // Auto-scroll to the latest message
+  
+      messageList.innerHTML = messages.map(msg => {
+        const displayName = msg.sender === nickname ? "You" : msg.sender;
+        return `<li class="${msg.sender === nickname ? "sent-message" : "received-message"}">[${msg.timestamp}] ${displayName}: ${msg.content}</li>`;
+      }).join("");
+  
       messageList.scrollTop = messageList.scrollHeight;
-  }
-
-  window.closeChat = function (nickname) {
+    };
+  
+    const updateOnlineUsers = (users) => {
+      const userList = document.getElementById("onlineUserList");
+      userList.innerHTML = users.filter(user => user.nickname !== nickname).map(user => `
+        <li class="online-user" data-nickname="${user.nickname}" onclick="openPrivateChat('${user.nickname}', '${user.firstName}', '${user.lastName}')">
+          ${user.firstName} ${user.lastName}
+        </li>
+      `).join("");
+    };
+  
+    window.openPrivateChat = (nickname, firstName, lastName) => {
+      let chatBox = document.getElementById(`chat-${nickname}`) || createChatBox(nickname, firstName, lastName);
+      chatBox.style.display = "block";
+      resetUnreadCount(nickname);
+    };
+  
+    const createChatBox = (nickname, firstName, lastName) => {
+      const chatBox = document.createElement("div");
+      chatBox.id = `chat-${nickname}`;
+      chatBox.className = "private-chat";
+      chatBox.innerHTML = `
+        <div class="chat-header">
+          <h4>Chat with ${firstName} ${lastName}</h4>
+          <button class="close-chat" onclick="closeChat('${nickname}')">×</button>
+        </div>
+        <ul class="chat-messages" id="messages-${nickname}"></ul>
+        <input type="text" id="input-${nickname}" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendPrivateMessage('${nickname}')">
+        <button onclick="sendPrivateMessage('${nickname}')">Send</button>
+      `;
+      document.getElementById("chatContainer").appendChild(chatBox);
+      return chatBox;
+    };
+  
+    window.sendPrivateMessage = (receiver) => {
+        const messageInput = document.getElementById(`input-${receiver}`);
+        const message = messageInput.value.trim();
+        if (message) {
+          const data = {
+            sender: nickname,
+            receiver,
+            content: message,
+            timestamp: new Date().toLocaleTimeString(),
+          };
+          socket.send(JSON.stringify(data));
+          displayPrivateMessage({ ...data, firstName: "", lastName: "" });
+          messageInput.value = "";
+      
+          resetUnreadCount(receiver);
+        }
+      };
+      
+  
+    const displayPrivateMessage = (data) => {
+      const chatWith = data.sender === nickname ? data.receiver : data.sender;
+      const chatBox = document.getElementById(`chat-${chatWith}`) || openPrivateChat(chatWith, data.firstName, data.lastName);
+      const messageList = document.getElementById(`messages-${chatWith}`);
+      if (!messageList) return;
+  
+      const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
+      messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
+      messageList.scrollTop = messageList.scrollHeight;
+    };
+  
+    window.closeChat = (nickname) => {
       const chatBox = document.getElementById(`chat-${nickname}`);
-      if (chatBox) {
-          chatBox.style.display = "none"; // Hide the chat instead of deleting it
-      }
-  };
-});
+      if (chatBox) chatBox.style.display = "none";
+    };
+  
+    const resetUnreadCount = (nickname) => {
+        const userElement = document.querySelector(`.online-user[data-nickname="${nickname}"]`);
+        if (userElement) {
+          userElement.style.backgroundColor = ""; // Reset background color
+          const badge = userElement.querySelector(".unread-badge");
+          if (badge) badge.remove(); // Clear the badge
+        }
+      };
+  });

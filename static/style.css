@@ -194,9 +194,6 @@ a, button, input, textarea {
 }
 
 .header-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -558,7 +555,9 @@ button:disabled {
   background: none;
   border: none;
   padding: 0;
+  color: rgb(133, 120, 120); 
 }
+
 
 .auth-form input[type="password"] {
   padding-right: 40px;
@@ -575,16 +574,6 @@ button:disabled {
   padding: 0.5rem;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 /****************************************/
 
