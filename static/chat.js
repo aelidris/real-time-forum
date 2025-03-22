@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const showNotification = (sender) => {
       const userElement = document.querySelector(`.online-user[data-nickname="${sender}"]`);
       if (userElement) {
-        userElement.style.backgroundColor = "#ffeb3b";
+        userElement.style.backgroundColor = "#f1a564";
         userElement.style.transition = "background-color 0.3s ease";
   
         let badge = userElement.querySelector(".unread-badge") || document.createElement("span");
@@ -65,7 +65,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window.openPrivateChat = (nickname, firstName, lastName) => {
       let chatBox = document.getElementById(`chat-${nickname}`) || createChatBox(nickname, firstName, lastName);
       chatBox.style.display = "block";
-      resetUnreadCount(nickname);
     };
   
     const createChatBox = (nickname, firstName, lastName) => {
