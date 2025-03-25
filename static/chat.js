@@ -109,102 +109,36 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   
     window.sendPrivateMessage = (receiver) => {
-        const messageInput = document.getElementById(`input-${receiver}`);
-        const message = messageInput.value.trim();
-        if (message) {
+      const messageInput = document.getElementById(`input-${receiver}`);
+      const message = messageInput.value.trim();
+      if (message) {
           const data = {
-            sender: nickname,
-            receiver,
-            content: message,
-            timestamp: new Date().toLocaleTimeString(),
+              sender: nickname,
+              receiver,
+              content: message,
+              timestamp: new Date().toLocaleTimeString(),
           };
           socket.send(JSON.stringify(data));
-          displayPrivateMessage({ ...data, firstName, lastName});
+          
+          // Display the message in sender's UI immediately
+          displayPrivateMessage({ 
+              ...data, 
+              firstName: "You", // Or get actual first name if available
+              lastName: "" 
+          });
+          
           messageInput.value = "";
-      
+          
+          // Force update sender's contact list
+          userActivity[receiver] = Date.now();
+          updateOnlineUsersList(); // This will re-sort contacts
+          
           resetUnreadCount(receiver);
-        }
-      };
-      
-  
-    
-    const updateOnlineUsers = (users) => {
-      
-      const userList = document.getElementById("onlineUserList");
-      
-      const userData = users
-          .filter(user => user.nickname !== nickname)
-          .map(user => ({
-              ...user,
-              lastActivity: userActivity[user.nickname] || 0,
-              unread: unreadCounts[user.nickname] || 0
-          }));
-      
-      // Sort by last activity (most recent first), then by name
-      userData.sort((a, b) => {
-          if (a.lastActivity && b.lastActivity) {
-              return b.lastActivity - a.lastActivity;
-          }
-          if (a.lastActivity) return -1;
-          if (b.lastActivity) return 1;
-          return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-      });
-      
-      // Clear the list
-      userList.innerHTML = '';
-      
-      // Add sorted users to the list with notifications
-      userData.forEach(user => {
-          const userElement = document.createElement('li');
-          userElement.className = 'online-user';
-          userElement.dataset.nickname = user.nickname;
-          
-          // Add container for name (separate from badge)
-          const nameContainer = document.createElement('div');
-          nameContainer.className = 'user-name-container';
-          nameContainer.innerHTML = `
-              <span class="user-first-name">${user.firstName}</span>
-              <span class="user-last-name">${user.lastName}</span>
-          `;
-          userElement.appendChild(nameContainer);
-          
-          // Add unread badge if needed
-          if (user.unread > 0) {
-              const badge = document.createElement("span");
-              badge.className = "unread-badge";
-              badge.textContent = user.unread;
-              userElement.appendChild(badge);
-          }
-          
-          userElement.onclick = () => {
-              openPrivateChat(user.nickname, user.firstName, user.lastName);
-              resetUnreadCount(user.nickname);
-          };
-          
-          userList.appendChild(userElement);
-      });
-  };
-
-    const displayPrivateMessage = (data) => {
-        const chatWith = data.sender === nickname ? data.receiver : data.sender;
-        const chatBox = document.getElementById(`chat-${chatWith}`) || openPrivateChat(chatWith, data.firstName, data.lastName);
-        const messageList = document.getElementById(`messages-${chatWith}`);
-        if (!messageList) return;
-
-        // Update the last activity time for this user (current timestamp)
-        userActivity[chatWith] = Date.now();
-
-        // If message is received and chat is not open, show notification
-        if (data.sender !== nickname && !document.getElementById(`chat-${chatWith}`)?.style.display === "block") {
-          showNotification(data.sender);
       }
-        
-        const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
-        messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
-        messageList.scrollTop = messageList.scrollHeight;
-        
-        // Re-sort the online users list
-        const onlineUsers = Array.from(document.querySelectorAll('.online-user'))
+  };
+      
+  const updateOnlineUsersList = () => {
+    const onlineUsers = Array.from(document.querySelectorAll('.online-user'))
         .map(el => {
             const firstNameEl = el.querySelector('.user-first-name');
             const lastNameEl = el.querySelector('.user-last-name');
@@ -212,12 +146,87 @@ document.addEventListener("DOMContentLoaded", () => {
             return {
                 nickname: el.dataset.nickname,
                 firstName: firstNameEl ? firstNameEl.textContent : '',
-                lastName: lastNameEl ? lastNameEl.textContent : ''
+                lastName: lastNameEl ? lastNameEl.textContent : '',
+                lastActivity: userActivity[el.dataset.nickname] || 0,
+                unread: unreadCounts[el.dataset.nickname] || 0
             };
-            });
-            
-        updateOnlineUsers(onlineUsers);
-    };
+        });
+    
+    updateOnlineUsers(onlineUsers);
+};
+    
+const updateOnlineUsers = (users) => {
+  const userList = document.getElementById("onlineUserList");
+  
+  // Sort by last activity (most recent first), then by name
+  users.sort((a, b) => {
+      if (a.lastActivity && b.lastActivity) {
+          return b.lastActivity - a.lastActivity;
+      }
+      if (a.lastActivity) return -1;
+      if (b.lastActivity) return 1;
+      return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+  });
+  
+  // Clear the list
+  userList.innerHTML = '';
+  
+  // Add sorted users to the list with notifications
+  users.forEach(user => {
+      if (user.nickname === nickname) return; // Skip self
+      
+      const userElement = document.createElement('li');
+      userElement.className = 'online-user';
+      userElement.dataset.nickname = user.nickname;
+      
+      // Add container for name (separate from badge)
+      const nameContainer = document.createElement('div');
+      nameContainer.className = 'user-name-container';
+      nameContainer.innerHTML = `
+          <span class="user-first-name">${user.firstName}</span>
+          <span class="user-last-name">${user.lastName}</span>
+      `;
+      userElement.appendChild(nameContainer);
+      
+      // Add unread badge if needed
+      if (user.unread > 0) {
+          const badge = document.createElement("span");
+          badge.className = "unread-badge";
+          badge.textContent = user.unread;
+          userElement.appendChild(badge);
+      }
+      
+      userElement.onclick = () => {
+          openPrivateChat(user.nickname, user.firstName, user.lastName);
+          resetUnreadCount(user.nickname);
+      };
+      
+      userList.appendChild(userElement);
+  });
+};
+
+  const displayPrivateMessage = (data) => {
+    const chatWith = data.sender === nickname ? data.receiver : data.sender;
+    const chatBox = document.getElementById(`chat-${chatWith}`) || openPrivateChat(chatWith, data.firstName, data.lastName);
+    const messageList = document.getElementById(`messages-${chatWith}`);
+    if (!messageList) return;
+
+    // Update the last activity time for this user (current timestamp)
+    userActivity[chatWith] = Date.now();
+
+    // If message is received and chat is not open, show notification
+    if (data.sender !== nickname && !document.getElementById(`chat-${chatWith}`)?.style.display === "block") {
+        showNotification(data.sender);
+    }
+    
+    const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
+    messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
+    messageList.scrollTop = messageList.scrollHeight;
+    
+    // Update the online users list for both sender and receiver
+    updateOnlineUsersList();
+    
+};
   
     window.closeChat = (nickname) => {
       const chatBox = document.getElementById(`chat-${nickname}`);
