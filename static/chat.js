@@ -86,10 +86,22 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   
   
+    let currentOpenChat = null;
+
     window.openPrivateChat = (nickname, firstName, lastName) => {
+      // Close the currently open chat (if any)
+      if (currentOpenChat) {
+          window.closeChat(currentOpenChat);
+      }
+  
+      // Open the new chat
       let chatBox = document.getElementById(`chat-${nickname}`) || createChatBox(nickname, firstName, lastName);
       chatBox.style.display = "block";
-    };
+  
+      // Update the currently open chat
+      currentOpenChat = nickname;
+  };
+  
   
     const createChatBox = (nickname, firstName, lastName) => {
       const chatBox = document.createElement("div");
@@ -123,7 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
           // Display the message in sender's UI immediately
           displayPrivateMessage({ 
               ...data, 
-              firstName: "You", // Or get actual first name if available
+              firstName: "You", 
               lastName: "" 
           });
           
@@ -228,10 +240,12 @@ const updateOnlineUsers = (users) => {
     
 };
   
-    window.closeChat = (nickname) => {
-      const chatBox = document.getElementById(`chat-${nickname}`);
-      if (chatBox) chatBox.style.display = "none";
-    };
+window.closeChat = (nickname) => {
+  const chatBox = document.getElementById(`chat-${nickname}`);
+  if (chatBox) chatBox.style.display = "none";
+  currentOpenChat = null; // Reset the tracker
+};
+
   
     const resetUnreadCount = (nickname) => {
       unreadCounts[nickname] = 0; // Set to 0 instead of deleting to maintain the key
