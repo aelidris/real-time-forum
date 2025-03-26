@@ -14,9 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
         case "notification":
           showNotification(data.sender);
           break;
-        case "chatHistory":
-          displayChatHistory(data.messages);
-          break;
         default:
           if (data.receiver) {
 
@@ -71,33 +68,87 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   
-    const displayChatHistory = (messages) => {
-      if (!messages?.length) return;
-      const chatWith = messages[0].receiver === nickname ? messages[0].sender : messages[0].receiver;
-      const messageList = document.getElementById(`messages-${chatWith}`);
-      if (!messageList) return;
-  
-      messageList.innerHTML = messages.map(msg => {
-        const displayName = msg.sender === nickname ? "You" : msg.sender;
-        return `<li class="${msg.sender === nickname ? "sent-message" : "received-message"}">[${msg.timestamp}] ${displayName}: ${msg.content}</li>`;
-      }).join("");
-  
-      messageList.scrollTop = messageList.scrollHeight;
-    };
-  
   
     let currentOpenChat = null;
 
-    window.openPrivateChat = (nickname, firstName, lastName) => {
+    function fetchHistoricalMessages(otherNickname) {
+      const nickname = localStorage.getItem("nickname") || "Guest";
+      
+      // Log the fetch attempt
+      console.log(`Attempting to fetch messages for user: ${nickname}, other user: ${otherNickname}`);
+  
+      fetch(`/fetch_messages?nickname=${encodeURIComponent(nickname)}&otherUser=${encodeURIComponent(otherNickname)}`, {
+          method: 'GET',
+          headers: {
+              'Content-Type': 'application/json'
+          }
+      })
+      .then(response => {
+          console.log('Response status:', response.status);
+          
+          // Log response headers for debugging
+          for (let [key, value] of response.headers.entries()) {
+              console.log(`${key}: ${value}`);
+          }
+  
+          if (!response.ok) {
+              // Try to get error details
+              return response.text().then(text => {
+                  console.error('Error response:', text);
+                  throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+              });
+          }
+          return response.json();
+      })
+      .then(messages => {
+          console.log('Fetched messages:', messages);
+  
+          // Clear existing messages
+          const messageList = document.getElementById(`messages-${otherNickname}`);
+          if (messageList) {
+              messageList.innerHTML = ''; // Clear existing messages
+  
+              // Display historical messages
+              messages.forEach(msg => {
+                  const displayName = msg.sender === nickname ? "You" : `${msg.senderFirstName} ${msg.senderLastName}`;
+                  const messageClass = msg.sender === nickname ? "sent-message" : "received-message";
+                  
+                  messageList.innerHTML += `
+                      <li class="${messageClass}">
+                          [${msg.timestamp}] ${displayName}: ${msg.content}
+                      </li>
+                  `;
+              });
+  
+              // Scroll to bottom
+              messageList.scrollTop = messageList.scrollHeight;
+          }
+      })
+      .catch(error => {
+          console.error('Detailed Error fetching messages:', error);
+          
+          // Optional: Show error to user
+          const messageList = document.getElementById(`messages-${otherNickname}`);
+          if (messageList) {
+              messageList.innerHTML = `<li class="error-message">Failed to load messages: ${error.message}</li>`;
+          }
+      });
+  }
+
+  // Modify openPrivateChat to fetch historical messages
+  window.openPrivateChat = (nickname, firstName, lastName) => {
       // Close the currently open chat (if any)
       if (currentOpenChat) {
           window.closeChat(currentOpenChat);
       }
-  
+
       // Open the new chat
       let chatBox = document.getElementById(`chat-${nickname}`) || createChatBox(nickname, firstName, lastName);
       chatBox.style.display = "block";
-  
+
+      // Fetch historical messages for this chat
+      fetchHistoricalMessages(nickname);
+
       // Update the currently open chat
       currentOpenChat = nickname;
   };

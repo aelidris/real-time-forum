@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -213,75 +214,6 @@ func sendPrivateMessage(msg Message) {
 		}
 	}
 
-	// Update chat history for both sender and receiver
-	for _, client := range clients {
-		if client.nickname == msg.Receiver || client.nickname == msg.Sender {
-			messages, err := getChatHistory(msg.Sender, msg.Receiver)
-			if err != nil {
-				fmt.Println("Error fetching chat history:", err)
-				return
-			}
-
-			response := map[string]interface{}{
-				"type":     "chatHistory",
-				"messages": messages,
-			}
-
-			err = client.conn.WriteJSON(response)
-			if err != nil {
-				fmt.Println("Error sending chat history:", err)
-				client.conn.Close()
-				delete(clients, client.conn)
-			}
-		}
-	}
-}
-
-func getChatHistory(sendernickname, receivernickname string) ([]Message, error) {
-	var senderID, receiverID int
-
-	// Get sender ID
-	err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", sendernickname).Scan(&senderID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get receiver ID
-	err = database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", receivernickname).Scan(&receiverID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fetch messages from the database
-	rows, err := database.DB.Query(`
-        SELECT sender_id, receiver_id, message, sent_at 
-        FROM chats 
-        WHERE (sender_id = ? AND receiver_id = ?) 
-        OR (sender_id = ? AND receiver_id = ?) 
-        ORDER BY sent_at ASC`, senderID, receiverID, receiverID, senderID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var messages []Message
-	for rows.Next() {
-		var msg Message
-		var senderID, receiverID int
-
-		err := rows.Scan(&senderID, &receiverID, &msg.Content, &msg.Timestamp)
-		if err != nil {
-			return nil, err
-		}
-
-		// Convert sender ID back to nickname
-		database.DB.QueryRow("SELECT nickname FROM users WHERE id = ?", senderID).Scan(&msg.Sender)
-		database.DB.QueryRow("SELECT nickname FROM users WHERE id = ?", receiverID).Scan(&msg.Receiver)
-
-		messages = append(messages, msg)
-	}
-
-	return messages, nil
 }
 
 func saveNotificationToDB(receiver, sender string) error {
@@ -333,6 +265,71 @@ func handleMessages() {
 	}
 }
 
+func fetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
+    // Get the current user's nickname and the other user's nickname
+    currentUser := r.URL.Query().Get("nickname")
+    otherUser := r.URL.Query().Get("otherUser")
+
+    if currentUser == "" || otherUser == "" {
+        http.Error(w, "Missing nickname or otherUser", http.StatusBadRequest)
+        return
+    }
+
+    // Updated query to use sent_at column
+    query := `
+        SELECT 
+            u_sender.nickname AS sender, 
+            u_receiver.nickname AS receiver, 
+            chats.message AS content, 
+            chats.sent_at AS timestamp,
+            u_sender.first_name AS sender_first_name,
+            u_sender.last_name AS sender_last_name
+        FROM chats
+        JOIN users u_sender ON chats.sender_id = u_sender.id
+        JOIN users u_receiver ON chats.receiver_id = u_receiver.id
+        WHERE 
+            (u_sender.nickname = ? AND u_receiver.nickname = ?) OR 
+            (u_sender.nickname = ? AND u_receiver.nickname = ?)
+        ORDER BY chats.sent_at
+        LIMIT 100
+    `
+
+    // Prepare to store messages
+    var messages []Message
+
+    // Execute query
+    rows, err := database.DB.Query(query, currentUser, otherUser, otherUser, currentUser)
+    if err != nil {
+        log.Printf("Database Query Error: %v", err)
+        http.Error(w, "Failed to fetch messages: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+    defer rows.Close()
+
+    // Scan results
+    for rows.Next() {
+        var msg Message
+        err := rows.Scan(
+            &msg.Sender, 
+            &msg.Receiver, 
+            &msg.Content, 
+            &msg.Timestamp,
+            &msg.SenderFirstName,
+            &msg.SenderLastName,
+        )
+        if err != nil {
+            log.Printf("Row Scan Error: %v", err)
+            http.Error(w, "Error processing messages: "+err.Error(), http.StatusInternalServerError)
+            return
+        }
+        messages = append(messages, msg)
+    }
+
+    // Send messages as JSON response
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(messages)
+}
+
 func main() {
 	if err := database.InitDB(); err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
@@ -353,6 +350,7 @@ func main() {
 	http.HandleFunc("/logout", auth.LogoutHandler)
 	http.HandleFunc("/register", auth.RegisterHandler)
 
+	http.HandleFunc("/fetch_messages", fetchMessagesHandler)
 	http.HandleFunc("/ws", handleConnections)
 	go handleMessages() // Run message handling in a separate goroutine
 
