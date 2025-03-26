@@ -20,8 +20,8 @@ type Message struct {
 	Receiver        string `json:"receiver"` // Added for private messaging
 	Content         string `json:"content"`
 	Timestamp       string `json:"timestamp"`
-	SenderFirstName string `json:"firstName"` // ✅ New field
-	SenderLastName  string `json:"lastName"`  // ✅ New field
+	SenderFirstName string `json:"firstName"` 
+	SenderLastName  string `json:"lastName"`  
 }
 
 // Define the Client struct

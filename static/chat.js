@@ -83,23 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
               'Content-Type': 'application/json'
           }
       })
-      .then(response => {
-          console.log('Response status:', response.status);
-          
-          // Log response headers for debugging
-          for (let [key, value] of response.headers.entries()) {
-              console.log(`${key}: ${value}`);
-          }
-  
-          if (!response.ok) {
-              // Try to get error details
-              return response.text().then(text => {
-                  console.error('Error response:', text);
-                  throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
-              });
-          }
-          return response.json();
-      })
+      .then(response => response.json())
       .then(messages => {
           console.log('Fetched messages:', messages);
   
@@ -110,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
               // Display historical messages
               messages.forEach(msg => {
-                  const displayName = msg.sender === nickname ? "You" : `${msg.senderFirstName} ${msg.senderLastName}`;
+                  const displayName = msg.sender === nickname ? "You" : `${msg.firstName} ${msg.lastName}`;
                   const messageClass = msg.sender === nickname ? "sent-message" : "received-message";
                   
                   messageList.innerHTML += `
