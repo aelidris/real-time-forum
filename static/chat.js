@@ -3,8 +3,55 @@ document.addEventListener("DOMContentLoaded", () => {
     const socket = new WebSocket(`ws://localhost:8080/ws?nickname=${nickname}`);
   
     socket.onopen = () => console.log("Connected to WebSocket server");
-    socket.onclose = () => console.log("Disconnected from WebSocket server");
   
+    // Add this to your existing script
+function handleLogout() {
+    // Close the WebSocket connection properly
+    if (socket.readyState === WebSocket.OPEN) {
+        socket.close(1000, "User logged out");
+    }
+    
+    // Immediately update UI to show offline status
+    const userElements = document.querySelectorAll('.online-user');
+    userElements.forEach(el => {
+        const statusDot = el.querySelector('.status-dot');
+        if (statusDot) {
+            statusDot.classList.remove('online');
+            statusDot.classList.add('offline');
+            statusDot.title = 'Last seen: Just now';
+        }
+    });
+    
+    // Clear local data
+    localStorage.removeItem("nickname");
+    window.location.href = "/"; // Or your preferred redirect
+}
+
+// Modify your existing logout button click handler
+document.querySelector("#logoutButton").addEventListener("click", (e) => {
+    e.preventDefault();
+    handleLogout();
+    
+    // Optional: Notify server about logout
+    fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+    }).catch(err => console.error('Logout API error:', err));
+});
+
+// Enhance WebSocket close handler
+socket.onclose = (event) => {
+    console.log("Disconnected from WebSocket server", event.reason);
+    
+    // Update all status dots to offline if this was our own logout
+    if (event.reason === "User logged out") {
+        document.querySelectorAll('.status-dot').forEach(dot => {
+            dot.classList.remove('online');
+            dot.classList.add('offline');
+        });
+    }
+};
+
     let allUsers = []; // Store all users
     let onlineUsers = []; // Store currently online users
     // Track last message times and unread counts

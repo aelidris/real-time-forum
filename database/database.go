@@ -193,7 +193,7 @@ func createTables() error {
 		log.Println("'chats' table created or already exists")
 	}
 
-	_, _ = DB.Exec(`
+	_, err = DB.Exec(`
     	CREATE TABLE IF NOT EXISTS user_status (
 		user_id INTEGER PRIMARY KEY,
 		is_online BOOLEAN NOT NULL DEFAULT FALSE,
@@ -201,7 +201,12 @@ func createTables() error {
 		FOREIGN KEY (user_id) REFERENCES users(id)
 	);
 	`)
-	
+	if err != nil {
+		log.Printf("Error creating 'user_status' table: %v", err)
+		return err
+	} else {
+		log.Println("'user_status' table created or already exists")
+	}
 
 	return nil
 }
