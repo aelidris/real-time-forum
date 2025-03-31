@@ -5,29 +5,61 @@ document.addEventListener("DOMContentLoaded", () => {
     socket.onopen = () => console.log("Connected to WebSocket server");
     socket.onclose = () => console.log("Disconnected from WebSocket server");
   
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      switch (data.type) {
-        case "onlineUsers":
-          updateOnlineUsers(data.users);
-          break;
-        case "notification":
-          showNotification(data.sender);
-          break;
-        default:
-          if (data.receiver) {
-
-            console.log("data that came to onmessage socket", data);
-            
-            displayPrivateMessage(data);
-            
-          }
-      }
-    };
-  
+    let allUsers = []; // Store all users
+    let onlineUsers = []; // Store currently online users
     // Track last message times and unread counts
     const userActivity = {};
     const unreadCounts = {};
+    
+    // Fetch all users when page loads
+    fetchAllUsers();
+    
+    function fetchAllUsers() {
+        fetch(`/get_all_users?nickname=${encodeURIComponent(nickname)}`)
+            .then(response => response.json())
+            .then(users => {
+                allUsers = users;
+                updateOnlineUsersList();
+            })
+            .catch(error => console.error('Error fetching users:', error));
+    }
+    
+ 
+    
+    function formatLastSeen(timestamp) {
+        if (!timestamp) return 'Never';
+        const now = new Date();
+        const lastSeen = new Date(timestamp);
+        const diffMinutes = Math.floor((now - lastSeen) / (1000 * 60));
+        
+        if (diffMinutes < 1) return 'Just now';
+        if (diffMinutes < 60) return `${diffMinutes} min ago`;
+        if (diffMinutes < 1440) return `${Math.floor(diffMinutes/60)} hours ago`;
+        return `${Math.floor(diffMinutes/1440)} days ago`;
+    }
+    
+    
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        switch (data.type) {
+            case "onlineUsers":
+                onlineUsers = data.users;
+                updateOnlineUsersList();
+                break;
+            case "notification":
+                showNotification(data.sender);
+                break;
+            default:
+                if (data.receiver) {
+                    // Update last activity when receiving a message
+                    userActivity[data.sender] = Date.now();
+                    displayPrivateMessage(data);
+                    updateOnlineUsersList();
+                }
+        }
+    };
+   
+    
 
     const showNotification = (sender) => {
       // Update unread count
@@ -185,71 +217,88 @@ document.addEventListener("DOMContentLoaded", () => {
   };
       
   const updateOnlineUsersList = () => {
-    const onlineUsers = Array.from(document.querySelectorAll('.online-user'))
-        .map(el => {
-            const firstNameEl = el.querySelector('.user-first-name');
-            const lastNameEl = el.querySelector('.user-last-name');
-
-            return {
-                nickname: el.dataset.nickname,
-                firstName: firstNameEl ? firstNameEl.textContent : '',
-                lastName: lastNameEl ? lastNameEl.textContent : '',
-                lastActivity: userActivity[el.dataset.nickname] || 0,
-                unread: unreadCounts[el.dataset.nickname] || 0
-            };
-        });
+    // Combine online status with all users data
+    const combinedUsers = allUsers.map(user => {
+        const isOnline = onlineUsers.some(u => u.nickname === user.nickname);
+        const lastActivity = userActivity[user.nickname] || 0;
+        const unread = unreadCounts[user.nickname] || 0;
+        
+        return {
+            ...user,
+            isOnline,
+            lastActivity,
+            unread
+        };
+    });
     
-    updateOnlineUsers(onlineUsers);
+    updateOnlineUsers(combinedUsers);
 };
     
 const updateOnlineUsers = (users) => {
-  const userList = document.getElementById("onlineUserList");
-  
-  // Sort by last activity (most recent first), then by name
-  users.sort((a, b) => {
-      if (a.lastActivity && b.lastActivity) {
-          return b.lastActivity - a.lastActivity;
-      }
-      if (a.lastActivity) return -1;
-      if (b.lastActivity) return 1;
-      return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-  });
-  
-  // Clear the list
-  userList.innerHTML = '';
-  
-  // Add sorted users to the list with notifications
-  users.forEach(user => {
-      if (user.nickname === nickname) return; // Skip self
-      
-      const userElement = document.createElement('li');
-      userElement.className = 'online-user';
-      userElement.dataset.nickname = user.nickname;
-      
-      // Add container for name (separate from badge)
-      const nameContainer = document.createElement('div');
-      nameContainer.className = 'user-name-container';
-      nameContainer.innerHTML = `
-          <span class="user-first-name">${user.firstName}</span>
-          <span class="user-last-name">${user.lastName}</span>
-      `;
-      userElement.appendChild(nameContainer);
-      
-      // Add unread badge if needed
-      if (user.unread > 0) {
-          const badge = document.createElement("span");
-          badge.className = "unread-badge";
-          badge.textContent = user.unread;
-          userElement.appendChild(badge);
-      }
-      
-      userElement.onclick = () => {
-          openPrivateChat(user.nickname, user.firstName, user.lastName);
-          resetUnreadCount(user.nickname);
-      };
-      
-      userList.appendChild(userElement);
-  });
+    const userList = document.getElementById("onlineUserList");
+    
+    // Sort users: online first, then by last activity, then by name
+    users.sort((a, b) => {
+        // Online users first
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+        
+        // Then by last activity (most recent first)
+        if (a.lastActivity && b.lastActivity) {
+            return b.lastActivity - a.lastActivity;
+        }
+        if (a.lastActivity) return -1;
+        if (b.lastActivity) return 1;
+        
+        // Finally by name
+        return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+    });
+    
+    // Clear the list
+    userList.innerHTML = '';
+    
+    // Add sorted users to the list
+    users.forEach(user => {
+        if (user.nickname === nickname) return; // Skip self
+        
+        const userElement = document.createElement('li');
+        userElement.className = 'online-user';
+        userElement.dataset.nickname = user.nickname;
+        
+        // Add status indicator
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = `status-dot ${user.isOnline ? 'online' : 'offline'}`;
+        statusIndicator.title = user.isOnline ? 'Online' : 
+            `Last seen: ${user.lastSeen ? formatLastSeen(user.lastSeen) : 'Never'}`;
+        
+        // Add container for name
+        const nameContainer = document.createElement('div');
+        nameContainer.className = 'user-name-container';
+        nameContainer.innerHTML = `
+            <span class="user-first-name">${user.firstName}</span>
+            <span class="user-last-name">${user.lastName}</span>
+        `;
+        
+        // Add unread badge if needed
+        let badgeElement = null;
+        if (user.unread > 0) {
+            badgeElement = document.createElement("span");
+            badgeElement.className = "unread-badge";
+            badgeElement.textContent = user.unread;
+        }
+        
+        // Assemble the elements
+        userElement.appendChild(statusIndicator);
+        userElement.appendChild(nameContainer);
+        if (badgeElement) userElement.appendChild(badgeElement);
+        
+        userElement.onclick = () => {
+            openPrivateChat(user.nickname, user.firstName, user.lastName);
+            resetUnreadCount(user.nickname);
+        };
+        
+        userList.appendChild(userElement);
+    });
 };
 
   const displayPrivateMessage = (data) => {

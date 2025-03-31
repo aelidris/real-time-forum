@@ -193,5 +193,15 @@ func createTables() error {
 		log.Println("'chats' table created or already exists")
 	}
 
+	_, _ = DB.Exec(`
+    	CREATE TABLE IF NOT EXISTS user_status (
+		user_id INTEGER PRIMARY KEY,
+		is_online BOOLEAN NOT NULL DEFAULT FALSE,
+		last_seen DATETIME,
+		FOREIGN KEY (user_id) REFERENCES users(id)
+	);
+	`)
+	
+
 	return nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -20,8 +21,8 @@ type Message struct {
 	Receiver        string `json:"receiver"` // Added for private messaging
 	Content         string `json:"content"`
 	Timestamp       string `json:"timestamp"`
-	SenderFirstName string `json:"firstName"` 
-	SenderLastName  string `json:"lastName"`  
+	SenderFirstName string `json:"firstName"`
+	SenderLastName  string `json:"lastName"`
 }
 
 // Define the Client struct
@@ -52,6 +53,16 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	// Get nickname from query params
 	nickname := r.URL.Query().Get("nickname")
 
+	// Update user status to online
+	_, err = database.DB.Exec(`
+        INSERT OR REPLACE INTO user_status (user_id, is_online, last_seen)
+        SELECT id, TRUE, CURRENT_TIMESTAMP FROM users WHERE nickname = ?
+    `, nickname)
+	if err != nil {
+		fmt.Println("Error updating user status:", err)
+		return
+	}
+
 	// Fetch first & last name from the database
 	var firstName, lastName string
 	err = database.DB.QueryRow("SELECT first_name, last_name FROM users WHERE nickname = ?", nickname).Scan(&firstName, &lastName)
@@ -72,6 +83,24 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	clients[conn] = client
 	broadcastOnlineUsers() // Update user list
 	mu.Unlock()
+
+	defer func() {
+		mu.Lock()
+		delete(clients, conn)
+		mu.Unlock()
+
+		// Update user status to offline
+		_, err = database.DB.Exec(`
+            UPDATE user_status 
+            SET is_online = FALSE, last_seen = CURRENT_TIMESTAMP
+            WHERE user_id = (SELECT id FROM users WHERE nickname = ?)
+        `, nickname)
+		if err != nil {
+			fmt.Println("Error updating user status to offline:", err)
+		}
+
+		broadcastOnlineUsers() // Update user list
+	}()
 
 	for {
 		var msg Message
@@ -96,6 +125,72 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			broadcast <- msg
 		}
 	}
+}
+
+func getAllUsersHandler(w http.ResponseWriter, r *http.Request) {
+	currentUser := r.URL.Query().Get("nickname")
+	if currentUser == "" {
+		http.Error(w, "Missing nickname", http.StatusBadRequest)
+		return
+	}
+
+	query := `
+        SELECT 
+            u.id,
+            u.nickname,
+            u.first_name,
+            u.last_name,
+            CASE WHEN s.is_online THEN 1 ELSE 0 END as is_online,
+            s.last_seen
+        FROM users u
+        LEFT JOIN user_status s ON u.id = s.user_id
+        WHERE u.nickname != ?
+        ORDER BY 
+            CASE WHEN s.is_online THEN 0 ELSE 1 END,  -- Online users first
+            u.first_name, u.last_name
+    `
+
+	type User struct {
+		ID        int    `json:"id"`
+		Nickname  string `json:"nickname"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+		IsOnline  bool   `json:"isOnline"`
+		LastSeen  string `json:"lastSeen,omitempty"`
+	}
+
+	var users []User
+
+	rows, err := database.DB.Query(query, currentUser)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user User
+		var lastSeen sql.NullString
+		err := rows.Scan(
+			&user.ID,
+			&user.Nickname,
+			&user.FirstName,
+			&user.LastName,
+			&user.IsOnline,
+			&lastSeen,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if lastSeen.Valid {
+			user.LastSeen = lastSeen.String
+		}
+		users = append(users, user)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(users)
 }
 
 func saveMessage(sendernickname, receivernickname, content string) {
@@ -266,17 +361,17 @@ func handleMessages() {
 }
 
 func fetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
-    // Get the current user's nickname and the other user's nickname
-    currentUser := r.URL.Query().Get("nickname")
-    otherUser := r.URL.Query().Get("otherUser")
+	// Get the current user's nickname and the other user's nickname
+	currentUser := r.URL.Query().Get("nickname")
+	otherUser := r.URL.Query().Get("otherUser")
 
-    if currentUser == "" || otherUser == "" {
-        http.Error(w, "Missing nickname or otherUser", http.StatusBadRequest)
-        return
-    }
+	if currentUser == "" || otherUser == "" {
+		http.Error(w, "Missing nickname or otherUser", http.StatusBadRequest)
+		return
+	}
 
-    // Updated query to use sent_at column
-    query := `
+	// Updated query to use sent_at column
+	query := `
         SELECT 
             u_sender.nickname AS sender, 
             u_receiver.nickname AS receiver, 
@@ -294,40 +389,40 @@ func fetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
         LIMIT 100
     `
 
-    // Prepare to store messages
-    var messages []Message
+	// Prepare to store messages
+	var messages []Message
 
-    // Execute query
-    rows, err := database.DB.Query(query, currentUser, otherUser, otherUser, currentUser)
-    if err != nil {
-        log.Printf("Database Query Error: %v", err)
-        http.Error(w, "Failed to fetch messages: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
-    defer rows.Close()
+	// Execute query
+	rows, err := database.DB.Query(query, currentUser, otherUser, otherUser, currentUser)
+	if err != nil {
+		log.Printf("Database Query Error: %v", err)
+		http.Error(w, "Failed to fetch messages: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
 
-    // Scan results
-    for rows.Next() {
-        var msg Message
-        err := rows.Scan(
-            &msg.Sender, 
-            &msg.Receiver, 
-            &msg.Content, 
-            &msg.Timestamp,
-            &msg.SenderFirstName,
-            &msg.SenderLastName,
-        )
-        if err != nil {
-            log.Printf("Row Scan Error: %v", err)
-            http.Error(w, "Error processing messages: "+err.Error(), http.StatusInternalServerError)
-            return
-        }
-        messages = append(messages, msg)
-    }
+	// Scan results
+	for rows.Next() {
+		var msg Message
+		err := rows.Scan(
+			&msg.Sender,
+			&msg.Receiver,
+			&msg.Content,
+			&msg.Timestamp,
+			&msg.SenderFirstName,
+			&msg.SenderLastName,
+		)
+		if err != nil {
+			log.Printf("Row Scan Error: %v", err)
+			http.Error(w, "Error processing messages: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		messages = append(messages, msg)
+	}
 
-    // Send messages as JSON response
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(messages)
+	// Send messages as JSON response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(messages)
 }
 
 func main() {
@@ -350,6 +445,8 @@ func main() {
 	http.HandleFunc("/logout", auth.LogoutHandler)
 	http.HandleFunc("/register", auth.RegisterHandler)
 
+
+	http.HandleFunc("/get_all_users", getAllUsersHandler)
 	http.HandleFunc("/fetch_messages", fetchMessagesHandler)
 	http.HandleFunc("/ws", handleConnections)
 	go handleMessages() // Run message handling in a separate goroutine
