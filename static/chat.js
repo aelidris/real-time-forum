@@ -203,8 +203,6 @@ document.addEventListener("DOMContentLoaded", () => {
             messageList.insertBefore(loadingIndicator, messageList.firstChild);
         }
         
-        console.log(`Fetching messages for: ${nickname}, other: ${otherNickname}, offset: ${offset}, limit: ${limit}`);
-        
         fetch(`/fetch_messages?nickname=${encodeURIComponent(nickname)}&otherUser=${encodeURIComponent(otherNickname)}&offset=${offset}&limit=${limit}`, {
             method: 'GET',
             headers: {
@@ -213,27 +211,24 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .then(response => response.json())
         .then(messages => {
-            console.log('Fetched messages:', messages);
+            // Sort messages by timestamp in descending order (newest first)
+            if (offset!=0) {
+                messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            }
             
-            // Get reference to message list
             const messageList = document.getElementById(`messages-${otherNickname}`);
             if (!messageList) return;
             
-            // If this is the first load, clear existing content
             if (!append) {
                 messageList.innerHTML = '';
             } else {
-                // Remove loading indicator if present
                 const loadingIndicator = messageList.querySelector('.loading-message');
                 if (loadingIndicator) {
                     messageList.removeChild(loadingIndicator);
                 }
             }
             
-            // Store the previous scroll height if appending
             const prevScrollHeight = append ? messageList.scrollHeight : 0;
-            
-            // Save scroll position if appending
             const scrollPos = append ? messageList.scrollTop : 0;
             
             // Create message elements
@@ -248,22 +243,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 messageElements.push(msgElement);
             });
             
-            // Add messages to the DOM
             if (append) {
-                // Add older messages at the top
-                messageElements.forEach(element => {
+                // Add older messages at the top in reverse order (newest of the batch at bottom)
+                messageElements.reverse().forEach(element => {
                     messageList.insertBefore(element, messageList.firstChild);
                 });
                 
-                // Store data attribute to track total loaded messages
+                // Maintain scroll position
+                messageList.scrollTop = scrollPos + (messageList.scrollHeight - prevScrollHeight);
+                
                 const currentCount = parseInt(messageList.getAttribute('data-loaded-count') || '0');
                 messageList.setAttribute('data-loaded-count', currentCount + messages.length);
                 
-                // If we got fewer messages than requested, disable infinite scroll
                 if (messages.length < limit) {
                     messageList.setAttribute('data-all-loaded', 'true');
                     
-                    // Add "no more messages" indicator if appropriate
                     if (messages.length === 0) {
                         const noMoreMsg = document.createElement('li');
                         noMoreMsg.className = 'info-message';
@@ -271,37 +265,29 @@ document.addEventListener("DOMContentLoaded", () => {
                         messageList.insertBefore(noMoreMsg, messageList.firstChild);
                     }
                 }
-                
-                // Restore scroll position accounting for new content
-                messageList.scrollTop = scrollPos + (messageList.scrollHeight - prevScrollHeight);
             } else {
-                // Initial load - add messages and scroll to bottom
+                // Initial load - add messages in reverse order (newest at bottom)
                 messageElements.forEach(element => {
                     messageList.appendChild(element);
                 });
                 
-                // Set initial count
                 messageList.setAttribute('data-loaded-count', messages.length);
                 
-                // If fewer than limit, mark as all loaded
                 if (messages.length < limit) {
                     messageList.setAttribute('data-all-loaded', 'true');
                 }
                 
-                // Scroll to bottom on initial load
+                // Scroll to bottom to show newest messages
                 messageList.scrollTop = messageList.scrollHeight;
             }
         })
         .catch(error => {
             console.error('Error fetching messages:', error);
-            
-            // Show error message
             const messageList = document.getElementById(`messages-${otherNickname}`);
             if (messageList) {
                 if (!append) {
                     messageList.innerHTML = `<li class="error-message">Failed to load messages: ${error.message}</li>`;
                 } else {
-                    // Remove loading indicator and add error
                     const loadingIndicator = messageList.querySelector('.loading-message');
                     if (loadingIndicator) {
                         loadingIndicator.className = 'error-message';
@@ -340,6 +326,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     // Calculate offset based on already loaded messages
                     const loadedCount = parseInt(messageList.getAttribute('data-loaded-count') || '0');
+                    console.log(loadedCount);
                     
                     // Load more messages
                     fetchHistoricalMessages(nickname, loadedCount, true).finally(() => {
