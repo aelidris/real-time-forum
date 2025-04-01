@@ -211,10 +211,20 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .then(response => response.json())
         .then(messages => {
-            // Sort messages by timestamp in descending order (newest first)
-            if (offset!=0) {
-                messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            }
+            
+            // Sort messages by timestamp and then by a secondary identifier (like message ID or sequence)
+            messages.sort((a, b) => {
+                const timeDiff = new Date(a.timestamp) - new Date(b.timestamp);
+                if (timeDiff !== 0) return timeDiff;
+                
+                // If timestamps are equal, use a secondary sort criterion
+                // This could be a database ID, sequence number, or any other unique identifier
+                // If your messages have an 'id' field, use that:
+                if (a.id && b.id) return a.id - b.id;
+                
+                // Fallback: compare content if no IDs exist (not ideal but works as last resort)
+                return a.content.localeCompare(b.content);
+            });
             
             const messageList = document.getElementById(`messages-${otherNickname}`);
             if (!messageList) return;
