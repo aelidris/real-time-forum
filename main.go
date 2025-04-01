@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -15,17 +14,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Define the WebSocket message structure
 type Message struct {
 	Sender          string `json:"sender"`
-	Receiver        string `json:"receiver"` // Added for private messaging
+	Receiver        string `json:"receiver"`
 	Content         string `json:"content"`
 	Timestamp       string `json:"timestamp"`
 	SenderFirstName string `json:"firstName"`
 	SenderLastName  string `json:"lastName"`
 }
 
-// Define the Client struct
 type Client struct {
 	conn      *websocket.Conn
 	firstName string
@@ -33,98 +30,101 @@ type Client struct {
 	nickname  string
 }
 
-// Global variables
+type User struct {
+	ID        int    `json:"id"`
+	Nickname  string `json:"nickname"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	IsOnline  bool   `json:"isOnline"`
+	LastSeen  string `json:"lastSeen,omitempty"`
+}
+
 var (
-	upgrader  = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
-	clients   = make(map[*websocket.Conn]*Client) // Fixed map type
-	broadcast = make(chan Message)                // Channel for broadcasting messages
-	mu        sync.Mutex                          // Mutex for concurrent access
+	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	clients  = make(map[*websocket.Conn]*Client)
+	messages = make(chan Message)
+	mu       sync.Mutex
 )
 
-// Handle new WebSocket connections
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Println("WebSocket upgrade error:", err)
+		log.Println("WebSocket upgrade error:", err)
 		return
 	}
 	defer conn.Close()
 
-	// Get nickname from query params
 	nickname := r.URL.Query().Get("nickname")
-
-	// Update user status to online
-	_, err = database.DB.Exec(`
-        INSERT OR REPLACE INTO user_status (user_id, is_online, last_seen)
-        SELECT id, TRUE, CURRENT_TIMESTAMP FROM users WHERE nickname = ?
-    `, nickname)
-	if err != nil {
-		fmt.Println("Error updating user status:", err)
+	if nickname == "" {
 		return
 	}
 
-	// Fetch first & last name from the database
-	var firstName, lastName string
-	err = database.DB.QueryRow("SELECT first_name, last_name FROM users WHERE nickname = ?", nickname).Scan(&firstName, &lastName)
-	if err != nil {
-		fmt.Println("User not found in database:", err)
+	if err := updateUserStatus(nickname, true); err != nil {
+		log.Println("Error updating user status:", err)
 		return
 	}
 
-	// Create and store client
-	client := &Client{
-		conn:      conn,
-		nickname:  nickname,
-		firstName: firstName,
-		lastName:  lastName,
+	client, err := createClient(conn, nickname)
+	if err != nil {
+		log.Println("Error creating client:", err)
+		return
 	}
 
 	mu.Lock()
 	clients[conn] = client
-	broadcastOnlineUsers() // Update user list
+	broadcastOnlineUsers()
 	mu.Unlock()
 
-	defer func() {
-		mu.Lock()
-		delete(clients, conn)
-		mu.Unlock()
-
-		// Update user status to offline
-		_, err = database.DB.Exec(`
-            UPDATE user_status 
-            SET is_online = FALSE, last_seen = CURRENT_TIMESTAMP
-            WHERE user_id = (SELECT id FROM users WHERE nickname = ?)
-        `, nickname)
-		if err != nil {
-			fmt.Println("Error updating user status to offline:", err)
-		}
-
-		broadcastOnlineUsers() // Update user list
-	}()
+	defer cleanupClient(conn, nickname)
 
 	for {
 		var msg Message
-		err := conn.ReadJSON(&msg)
-		if err != nil {
-			fmt.Println("Error reading message:", err)
+		if err := conn.ReadJSON(&msg); err != nil {
+			log.Println("Error reading message:", err)
 			mu.Lock()
 			delete(clients, conn)
-			broadcastOnlineUsers() // Update user list
+			broadcastOnlineUsers()
 			mu.Unlock()
 			break
 		}
 
-		// Store the message in the database
 		saveMessage(msg.Sender, msg.Receiver, msg.Content)
-
 		if msg.Receiver != "" {
-			// Private message
 			sendPrivateMessage(msg)
 		} else {
-			// Broadcast public message
-			broadcast <- msg
+			messages <- msg
 		}
 	}
+}
+
+func updateUserStatus(nickname string, online bool) error {
+	_, err := database.DB.Exec(`
+		INSERT OR REPLACE INTO user_status (user_id, is_online, last_seen)
+		SELECT id, ?, CURRENT_TIMESTAMP FROM users WHERE nickname = ?`,
+		online, nickname)
+	return err
+}
+
+func createClient(conn *websocket.Conn, nickname string) (*Client, error) {
+	var firstName, lastName string
+	err := database.DB.QueryRow(
+		"SELECT first_name, last_name FROM users WHERE nickname = ?", nickname,
+	).Scan(&firstName, &lastName)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{conn, firstName, lastName, nickname}, nil
+}
+
+func cleanupClient(conn *websocket.Conn, nickname string) {
+	mu.Lock()
+	delete(clients, conn)
+	mu.Unlock()
+
+	if err := updateUserStatus(nickname, false); err != nil {
+		log.Println("Error updating user status to offline:", err)
+	}
+	broadcastOnlineUsers()
 }
 
 func getAllUsersHandler(w http.ResponseWriter, r *http.Request) {
@@ -134,98 +134,59 @@ func getAllUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `
-        SELECT 
-            u.id,
-            u.nickname,
-            u.first_name,
-            u.last_name,
-            CASE WHEN s.is_online THEN 1 ELSE 0 END as is_online,
-            s.last_seen
-        FROM users u
-        LEFT JOIN user_status s ON u.id = s.user_id
-        WHERE u.nickname != ?
-        ORDER BY 
-            CASE WHEN s.is_online THEN 0 ELSE 1 END,  -- Online users first
-            u.first_name, u.last_name
-    `
-
-	type User struct {
-		ID        int    `json:"id"`
-		Nickname  string `json:"nickname"`
-		FirstName string `json:"firstName"`
-		LastName  string `json:"lastName"`
-		IsOnline  bool   `json:"isOnline"`
-		LastSeen  string `json:"lastSeen,omitempty"`
-	}
-
-	var users []User
-
-	rows, err := database.DB.Query(query, currentUser)
+	users, err := queryUsers(currentUser)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	jsonResponse(w, users)
+}
+
+func queryUsers(currentUser string) ([]User, error) {
+	rows, err := database.DB.Query(`
+		SELECT u.id, u.nickname, u.first_name, u.last_name, 
+			CASE WHEN s.is_online THEN 1 ELSE 0 END as is_online, s.last_seen
+		FROM users u LEFT JOIN user_status s ON u.id = s.user_id
+		WHERE u.nickname != ? ORDER BY CASE WHEN s.is_online THEN 0 ELSE 1 END, u.first_name, u.last_name`,
+		currentUser)
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
+	var users []User
 	for rows.Next() {
 		var user User
 		var lastSeen sql.NullString
-		err := rows.Scan(
-			&user.ID,
-			&user.Nickname,
-			&user.FirstName,
-			&user.LastName,
-			&user.IsOnline,
-			&lastSeen,
-		)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if err := rows.Scan(&user.ID, &user.Nickname, &user.FirstName, &user.LastName, &user.IsOnline, &lastSeen); err != nil {
+			return nil, err
 		}
 		if lastSeen.Valid {
 			user.LastSeen = lastSeen.String
 		}
 		users = append(users, user)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(users)
+	return users, nil
 }
 
-func saveMessage(sendernickname, receivernickname, content string) {
+func saveMessage(sender, receiver, content string) {
 	var senderID, receiverID int
-
-	// Get sender ID
-	err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", sendernickname).Scan(&senderID)
-	if err != nil {
-		fmt.Println("Error getting sender ID:", err)
+	if err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", sender).Scan(&senderID); err != nil {
+		log.Println("Error getting sender ID:", err)
 		return
 	}
-
-	// Get receiver ID
-	err = database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", receivernickname).Scan(&receiverID)
-	if err != nil {
-		fmt.Println("Error getting receiver ID:", err)
+	if err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", receiver).Scan(&receiverID); err != nil {
+		log.Println("Error getting receiver ID:", err)
 		return
 	}
-
-	// Insert message into database
-	_, err = database.DB.Exec(`
-        INSERT INTO chats (sender_id, receiver_id, message) 
-        VALUES (?, ?, ?)`,
-		senderID, receiverID, content,
-	)
-	if err != nil {
-		fmt.Println("Error saving message:", err)
+	if _, err := database.DB.Exec("INSERT INTO chats (sender_id, receiver_id, message) VALUES (?, ?, ?)", senderID, receiverID, content); err != nil {
+		log.Println("Error saving message:", err)
 	}
 }
 
-// Broadcast the list of online users
 func broadcastOnlineUsers() {
-	var userList []map[string]string
-
-	// Collect online users
+	userList := make([]map[string]string, 0, len(clients))
 	for _, client := range clients {
 		userList = append(userList, map[string]string{
 			"nickname":  client.nickname,
@@ -239,118 +200,62 @@ func broadcastOnlineUsers() {
 		"users": userList,
 	}
 
-	// Send the list to all connected clients
 	for _, client := range clients {
-		err := client.conn.WriteJSON(message)
-		if err != nil {
-			fmt.Println("Error sending user list:", err)
+		if err := client.conn.WriteJSON(message); err != nil {
+			log.Println("Error sending user list:", err)
 			client.conn.Close()
 			mu.Lock()
-			delete(clients, client.conn) // Close connection only if it's faulty
+			delete(clients, client.conn)
 			mu.Unlock()
 		}
 	}
 }
 
-// Send a private message
 func sendPrivateMessage(msg Message) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	var senderFirstName, senderLastName string
-
-	// Find the sender’s first and last name from the connected clients
 	for _, client := range clients {
 		if client.nickname == msg.Sender {
-			senderFirstName = client.firstName
-			senderLastName = client.lastName
+			msg.SenderFirstName = client.firstName
+			msg.SenderLastName = client.lastName
 			break
 		}
 	}
 
-	// Add sender’s first and last name to the message
-	msg.SenderFirstName = senderFirstName
-	msg.SenderLastName = senderLastName
-
-	// Send the message to the receiver
-	messageSent := false
 	for _, client := range clients {
 		if client.nickname == msg.Receiver {
-			err := client.conn.WriteJSON(msg)
-			if err != nil {
-				fmt.Println("Error sending private message:", err)
+			if err := client.conn.WriteJSON(msg); err != nil {
+				log.Println("Error sending private message:", err)
 			} else {
-				messageSent = true
+				sendNotification(msg.Receiver, msg.Sender)
 			}
 			break
 		}
 	}
-
-	// Send notification if the receiver is online
-	if messageSent {
-		for _, client := range clients {
-			if client.nickname == msg.Receiver {
-				notification := map[string]string{
-					"type":   "notification",
-					"sender": msg.Sender, // Send the sender's nickname
-				}
-				err := client.conn.WriteJSON(notification)
-				if err != nil {
-					fmt.Println("Error sending notification:", err)
-				}
-				break
-			}
-		}
-	} else {
-		// Store notification in database if user is offline
-		err := saveNotificationToDB(msg.Receiver, msg.Sender) // Store the sender's nickname
-		if err != nil {
-			fmt.Println("Error storing notification:", err)
-		}
-	}
-
 }
 
-func saveNotificationToDB(receiver, sender string) error {
-	_, err := database.DB.Exec("INSERT INTO notifications (receiver, message, seen) VALUES (?, ?, 0)",
-		receiver, "New message from "+sender)
-	return err
+func sendNotification(receiver, sender string) {
+	for _, client := range clients {
+		if client.nickname == receiver {
+			if err := client.conn.WriteJSON(map[string]string{
+				"type":   "notification",
+				"sender": sender,
+			}); err != nil {
+				log.Println("Error sending notification:", err)
+			}
+			break
+		}
+	}
 }
 
 func handleMessages() {
-	for {
-		msg := <-broadcast // Receive a message from the channel
-
-		var senderFirstName, senderLastName string
-
-		// Find sender’s first and last name
-		for _, client := range clients {
-			if client.nickname == msg.Sender {
-				senderFirstName = client.firstName
-				senderLastName = client.lastName
-				break
-			}
-		}
-
-		// Attach sender's first and last name to the message
-		msg.SenderFirstName = senderFirstName
-		msg.SenderLastName = senderLastName
-
+	for msg := range messages {
 		mu.Lock()
 		for _, client := range clients {
-			if msg.Receiver == "" {
-				// Public message - send to all clients
-				err := client.conn.WriteJSON(msg)
-				if err != nil {
-					fmt.Println("Error sending public message:", err)
-					client.conn.Close()
-					delete(clients, client.conn)
-				}
-			} else if client.nickname == msg.Receiver {
-				// Private message - send only to the receiver
-				err := client.conn.WriteJSON(msg)
-				if err != nil {
-					fmt.Println("Error sending private message:", err)
+			if msg.Receiver == "" || client.nickname == msg.Receiver {
+				if err := client.conn.WriteJSON(msg); err != nil {
+					log.Println("Error sending message:", err)
 					client.conn.Close()
 					delete(clients, client.conn)
 				}
@@ -361,68 +266,54 @@ func handleMessages() {
 }
 
 func fetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
-	// Get the current user's nickname and the other user's nickname
 	currentUser := r.URL.Query().Get("nickname")
 	otherUser := r.URL.Query().Get("otherUser")
-
 	if currentUser == "" || otherUser == "" {
 		http.Error(w, "Missing nickname or otherUser", http.StatusBadRequest)
 		return
 	}
 
-	// Updated query to use sent_at column
-	query := `
-        SELECT 
-            u_sender.nickname AS sender, 
-            u_receiver.nickname AS receiver, 
-            chats.message AS content, 
-            chats.sent_at AS timestamp,
-            u_sender.first_name AS sender_first_name,
-            u_sender.last_name AS sender_last_name
-        FROM chats
-        JOIN users u_sender ON chats.sender_id = u_sender.id
-        JOIN users u_receiver ON chats.receiver_id = u_receiver.id
-        WHERE 
-            (u_sender.nickname = ? AND u_receiver.nickname = ?) OR 
-            (u_sender.nickname = ? AND u_receiver.nickname = ?)
-        ORDER BY chats.sent_at
-        LIMIT 100
-    `
-
-	// Prepare to store messages
-	var messages []Message
-
-	// Execute query
-	rows, err := database.DB.Query(query, currentUser, otherUser, otherUser, currentUser)
+	messages, err := queryMessages(currentUser, otherUser)
 	if err != nil {
-		log.Printf("Database Query Error: %v", err)
 		http.Error(w, "Failed to fetch messages: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	jsonResponse(w, messages)
+}
+
+func queryMessages(currentUser, otherUser string) ([]Message, error) {
+	rows, err := database.DB.Query(`
+		SELECT u_sender.nickname, u_receiver.nickname, chats.message, chats.sent_at, 
+			u_sender.first_name, u_sender.last_name
+		FROM chats
+		JOIN users u_sender ON chats.sender_id = u_sender.id
+		JOIN users u_receiver ON chats.receiver_id = u_receiver.id
+		WHERE (u_sender.nickname = ? AND u_receiver.nickname = ?) OR 
+			(u_sender.nickname = ? AND u_receiver.nickname = ?)
+		ORDER BY chats.sent_at LIMIT 100`,
+		currentUser, otherUser, otherUser, currentUser)
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 
-	// Scan results
+	var msgs []Message
 	for rows.Next() {
 		var msg Message
-		err := rows.Scan(
-			&msg.Sender,
-			&msg.Receiver,
-			&msg.Content,
-			&msg.Timestamp,
-			&msg.SenderFirstName,
-			&msg.SenderLastName,
-		)
-		if err != nil {
-			log.Printf("Row Scan Error: %v", err)
-			http.Error(w, "Error processing messages: "+err.Error(), http.StatusInternalServerError)
-			return
+		if err := rows.Scan(&msg.Sender, &msg.Receiver, &msg.Content, &msg.Timestamp, &msg.SenderFirstName, &msg.SenderLastName); err != nil {
+			return nil, err
 		}
-		messages = append(messages, msg)
+		msgs = append(msgs, msg)
 	}
+	return msgs, nil
+}
 
-	// Send messages as JSON response
+func jsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(messages)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Println("Error encoding JSON response:", err)
+	}
 }
 
 func main() {
@@ -431,9 +322,7 @@ func main() {
 	}
 	defer database.DB.Close()
 
-	fileServer := http.FileServer(http.Dir("./static"))
-	http.Handle("/static/", http.StripPrefix("/static", fileServer))
-
+	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("./static"))))
 	http.HandleFunc("/", handlers.HomePage)
 	http.HandleFunc("/show_posts", handlers.ShowPosts)
 	http.HandleFunc("/post_submit", handlers.PostSubmit)
@@ -444,17 +333,12 @@ func main() {
 	http.HandleFunc("/check-session", auth.CheckSessionHandler)
 	http.HandleFunc("/logout", auth.LogoutHandler)
 	http.HandleFunc("/register", auth.RegisterHandler)
-
-
 	http.HandleFunc("/get_all_users", getAllUsersHandler)
 	http.HandleFunc("/fetch_messages", fetchMessagesHandler)
 	http.HandleFunc("/ws", handleConnections)
-	go handleMessages() // Run message handling in a separate goroutine
 
-	log.Println("Server started on :8080")
-	fmt.Println("http://localhost:8080/")
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	go handleMessages()
+
+	log.Println("http://localhost:8080/")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
