@@ -268,12 +268,23 @@ func handleMessages() {
 func fetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	currentUser := r.URL.Query().Get("nickname")
 	otherUser := r.URL.Query().Get("otherUser")
+	offset := r.URL.Query().Get("offset")
+	limit := r.URL.Query().Get("limit")
+
 	if currentUser == "" || otherUser == "" {
 		http.Error(w, "Missing nickname or otherUser", http.StatusBadRequest)
 		return
 	}
 
-	messages, err := queryMessages(currentUser, otherUser)
+	// Set default values if not provided
+	if offset == "" {
+		offset = "0"
+	}
+	if limit == "" {
+		limit = "10"
+	}
+
+	messages, err := queryMessages(currentUser, otherUser, offset, limit)
 	if err != nil {
 		http.Error(w, "Failed to fetch messages: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -282,7 +293,7 @@ func fetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, messages)
 }
 
-func queryMessages(currentUser, otherUser string) ([]Message, error) {
+func queryMessages(currentUser, otherUser, offset, limit string) ([]Message, error) {
 	rows, err := database.DB.Query(`
 		SELECT u_sender.nickname, u_receiver.nickname, chats.message, chats.sent_at, 
 			u_sender.first_name, u_sender.last_name
@@ -291,8 +302,9 @@ func queryMessages(currentUser, otherUser string) ([]Message, error) {
 		JOIN users u_receiver ON chats.receiver_id = u_receiver.id
 		WHERE (u_sender.nickname = ? AND u_receiver.nickname = ?) OR 
 			(u_sender.nickname = ? AND u_receiver.nickname = ?)
-		ORDER BY chats.sent_at LIMIT 100`,
-		currentUser, otherUser, otherUser, currentUser)
+		ORDER BY chats.sent_at DESC
+		LIMIT ? OFFSET ?`,
+		currentUser, otherUser, otherUser, currentUser, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +318,12 @@ func queryMessages(currentUser, otherUser string) ([]Message, error) {
 		}
 		msgs = append(msgs, msg)
 	}
+
+	// Reverse the array so oldest messages appear first
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+
 	return msgs, nil
 }
 
