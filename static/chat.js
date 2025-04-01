@@ -339,10 +339,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.log(loadedCount);
                     
                     // Load more messages
-                    fetchHistoricalMessages(nickname, loadedCount, true).finally(() => {
-                        // Reset loading flag regardless of success/failure
-                        isLoading = false;
-                    });
+                    fetchHistoricalMessages(nickname, loadedCount, true)
+                    // Reset loading flag regardless of success/failure
+                    isLoading = false;
+                    
                 }
             }, 250); // Debounce 250ms
         });
