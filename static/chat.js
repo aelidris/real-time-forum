@@ -1,5 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const nickname = localStorage.getItem("nickname") || "Guest";
+    const nickname = localStorage.getItem("nickname");
+    console.log("nickname from chat.js:", nickname);
+    
     let socket = null;
     
     // All global variables
@@ -186,9 +188,52 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
     };
+
+    function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
+        const limit = 10;
+        const messageList = document.getElementById(`messages-${otherNickname}`);
+      
+        // Reset state on initial load
+        if (!append) {
+          messageList.innerHTML = '';
+          messageList.setAttribute('data-loaded-count', '0');
+          messageList.removeAttribute('data-all-loaded');
+        }
+      
+        // Fetch messages
+        fetch(`/fetch_messages?nickname=${encodeURIComponent(nickname)}&otherUser=${encodeURIComponent(otherNickname)}&offset=${offset}&limit=${limit}`)
+          .then(response => response.json())
+          .then(messages => {
+            // Sort messages by timestamp and then by a secondary identifier (like message ID or sequence)
+            messages.sort((a, b) => {
+                const timeDiff = new Date(a.timestamp) - new Date(b.timestamp);
+                if (timeDiff !== 0) return timeDiff;
+                
+                // If timestamps are equal, use a secondary sort criterion
+                // This could be a database ID, sequence number, or any other unique identifier
+                // If your messages have an 'id' field, use that:
+                if (a.id && b.id) return a.id - b.id;
+                
+                // Fallback: compare content if no IDs exist (not ideal but works as last resort)
+                return a.content.localeCompare(b.content);
+            });
+      
+            // Update message list
+            if (append && messages.length > 0) {
+              const currentCount = parseInt(messageList.getAttribute('data-loaded-count')) || 0;
+              messageList.setAttribute('data-loaded-count', currentCount + messages.length);
+            }
+      
+            // Set "all loaded" flag if no more messages
+            if (messages.length < limit) {
+              messageList.setAttribute('data-all-loaded', 'true');
+            }
+          })
+          .catch(error => console.error('Error:', error));
+      }
     
     function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
-        const nickname = localStorage.getItem("nickname") || "Guest";
+        // const nickname = localStorage.getItem("nickname") || "Guest";
         const limit = 10;
         
         // Show loading indicator
@@ -231,6 +276,8 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (!append) {
                 messageList.innerHTML = '';
+  messageList.setAttribute('data-loaded-count', '0'); // Reset counter
+  messageList.removeAttribute('data-all-loaded'); // Clear "all loaded" flag
             } else {
                 const loadingIndicator = messageList.querySelector('.loading-message');
                 if (loadingIndicator) {
@@ -354,6 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Close the currently open chat (if any)
         if (currentOpenChat) {
             window.closeChat(currentOpenChat);
+
         }
         
         // Open the new chat
@@ -547,9 +595,11 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     
     window.closeChat = (nickname) => {
+        
         const chatBox = document.getElementById(`chat-${nickname}`);
         if (chatBox) chatBox.style.display = "none";
         currentOpenChat = null; // Reset the tracker
+
     };
     
     const resetUnreadCount = (nickname) => {

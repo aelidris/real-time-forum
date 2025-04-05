@@ -24,8 +24,9 @@ document.getElementById("loginForm").addEventListener("submit", function (event)
         window.handleAuthSuccess();
       }
               // After successful login
-localStorage.setItem("nickname", data.nickname);
-console.log(data.nickname);
+              localStorage.setItem("nickname", data.nickname);
+              console.log(data.nickname);
+              window.location.reload();
 
     })
     .catch(error => {
