@@ -219,9 +219,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Add the user to the chats table (if needed)
 	_, err = database.DB.Exec(`
-		INSERT INTO chats (sender_id, receiver_id, message, sent_at)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
-		userID, 0, "Welcome to the chat!") // Assuming receiver_id 0 is for system messages
+		INSERT INTO chats (sender_id, receiver_id, message, sent_at, meta_data)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)`,
+		userID, 0, "Welcome to the chat!", nickname) // Assuming receiver_id 0 is for system messages
 	if err != nil {
 		log.Printf("Error inserting user into chat table: %v", err)
 		response = map[string]string{"error": "Chat registration failed"}

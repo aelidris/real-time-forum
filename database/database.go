@@ -182,6 +182,7 @@ func createTables() error {
     	    receiver_id INTEGER NOT NULL,
     	    message TEXT NOT NULL,
     	    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			meta_data TEXT DEFAULT NULL,
     	    FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
     	    FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE
     	);
