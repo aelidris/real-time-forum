@@ -761,6 +761,16 @@ button:disabled {
 
 /****************************************/
 
+.section-header {
+  padding: 8px 12px;
+  background-color: #f0f0f0;
+  color: #666;
+  font-weight: bold;
+  font-size: 0.9em;
+  border-bottom: 1px solid #ddd;
+  cursor: default;
+  user-select: none;
+}
 
 .status-dot {
   display: inline-block;

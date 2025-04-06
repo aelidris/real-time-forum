@@ -64,6 +64,29 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the user's ID based on nickname (you'll need to implement this)
+	userID, err := getUserIDByNickname(nickname)
+	if err != nil {
+		log.Println("Error getting user ID:", err)
+		return
+	}
+
+	// Get users who have conversations with this user
+	usersWithConversations, err := getUsersWithConversations(userID)
+	if err != nil {
+		log.Println("Error getting conversation users:", err)
+	} else {
+		log.Printf("User %s has conversations with: %v\n", nickname, usersWithConversations)
+	}
+
+	// Get users who don't have conversations with this user
+	usersWithoutConversations, err := getUsersWithoutConversations(userID)
+	if err != nil {
+		log.Println("Error getting non-conversation users:", err)
+	} else {
+		log.Printf("User %s has no conversations with: %v\n", nickname, usersWithoutConversations)
+	}
+
 	client, err := createClient(conn, nickname)
 	if err != nil {
 		log.Println("Error creating client:", err)
@@ -74,6 +97,15 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	clients[conn] = client
 	broadcastOnlineUsers()
 	mu.Unlock()
+
+	 // Send conversation data to the client
+	 conn.WriteJSON(map[string]interface{}{
+        "type": "conversation_data",
+        "data": map[string]interface{}{
+            "with_conversations":    usersWithConversations,
+            "without_conversations": usersWithoutConversations,
+        },
+    })
 
 	defer cleanupClient(conn, nickname)
 
@@ -95,6 +127,72 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			messages <- msg
 		}
 	}
+}
+
+// Get user ID from nickname
+func getUserIDByNickname(nickname string) (int, error) {
+	var id int
+	err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", nickname).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// Get users who have conversations with the given user
+func getUsersWithConversations(userID int) ([]string, error) {
+	query := `
+        SELECT DISTINCT u.nickname 
+        FROM users u
+        JOIN chats c ON u.id = c.sender_id OR u.id = c.receiver_id
+        WHERE (c.sender_id = ? OR c.receiver_id = ?) AND u.id != ?
+    `
+	rows, err := database.DB.Query(query, userID, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nicknames []string
+	for rows.Next() {
+		var nickname string
+		if err := rows.Scan(&nickname); err != nil {
+			return nil, err
+		}
+		nicknames = append(nicknames, nickname)
+	}
+	return nicknames, nil
+}
+
+// Get users who don't have conversations with the given user
+func getUsersWithoutConversations(userID int) ([]string, error) {
+	query := `
+        SELECT u.nickname 
+        FROM users u
+        WHERE u.id != ? AND u.id NOT IN (
+            SELECT DISTINCT CASE 
+                WHEN c.sender_id = ? THEN c.receiver_id 
+                ELSE c.sender_id 
+            END
+            FROM chats c
+            WHERE c.sender_id = ? OR c.receiver_id = ?
+        )
+    `
+	rows, err := database.DB.Query(query, userID, userID, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nicknames []string
+	for rows.Next() {
+		var nickname string
+		if err := rows.Scan(&nickname); err != nil {
+			return nil, err
+		}
+		nicknames = append(nicknames, nickname)
+	}
+	return nicknames, nil
 }
 
 func updateUserStatus(nickname string, online bool) error {

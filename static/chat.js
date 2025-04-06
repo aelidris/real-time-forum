@@ -65,11 +65,19 @@ document.addEventListener("DOMContentLoaded", () => {
             switch (data.type) {
                 case "onlineUsers":
                     onlineUsers = data.users;
+                    // Store current timestamp for all online users
+                    const now = Date.now();
+                    onlineUsers.forEach(u => userActivity[u.nickname] = now);
                     updateOnlineUsersList();
                     break;
                 case "notification":
                     showNotification(data.sender);
                     break;
+                    case "conversation_data":
+                        window.conversationData = data.data;
+                        console.log("Conversation data updated:", data.data);
+                        updateOnlineUsersList();
+                        break;
                 default:
                     if (data.receiver) {
                         // Update last activity when receiving a message
@@ -155,7 +163,10 @@ document.addEventListener("DOMContentLoaded", () => {
         // Update unread count
         unreadCounts[sender] = (unreadCounts[sender] || 0) + 1;
         
-        // Find the user element in the sorted list
+        // Update last activity time
+        userActivity[sender] = Date.now();
+        
+        // Find the user element
         const userElement = document.querySelector(`.online-user[data-nickname="${sender}"]`);
         
         if (userElement) {
@@ -163,11 +174,10 @@ document.addEventListener("DOMContentLoaded", () => {
             userElement.style.backgroundColor = "#f1a564";
             userElement.style.transition = "background-color 0.3s ease";
             
-            // Remove any existing badges first
+            // Update badge
             const existingBadges = userElement.querySelectorAll(".unread-badge");
             existingBadges.forEach(badge => badge.remove());
             
-            // Create new badge with updated count
             if (unreadCounts[sender] > 0) {
                 const badge = document.createElement("span");
                 badge.className = "unread-badge";
@@ -175,17 +185,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 userElement.appendChild(badge);
             }
             
-            // Remove highlight after 3 seconds
             setTimeout(() => {
                 userElement.style.backgroundColor = "";
             }, 3000);
             
-            // Move user to top of the list (most recent activity)
-            userActivity[sender] = Date.now();
-            const userList = document.getElementById("onlineUserList");
-            if (userElement.parentNode === userList) {
-                userList.prepend(userElement);
-            }
+            // Trigger full list update instead of manual reordering
+            updateOnlineUsersList();
         }
     };
     
@@ -485,69 +490,88 @@ function setupScrollHandler(nickname) {
     const updateOnlineUsers = (users) => {
         const userList = document.getElementById("onlineUserList");
         if (!userList) return;
-        
-        // Sort users: online first, then by last activity, then by name
-        users.sort((a, b) => {
-            // Online users first
-            if (a.isOnline && !b.isOnline) return -1;
-            if (!a.isOnline && b.isOnline) return 1;
-            
-            // Then by last activity (most recent first)
-            if (a.lastActivity && b.lastActivity) {
-                return b.lastActivity - a.lastActivity;
-            }
-            if (a.lastActivity) return -1;
-            if (b.lastActivity) return 1;
-            
-            // Finally by name
-            return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-        });
-        
-        // Clear the list
+    
+        // Get conversation data if available
+        const convData = window.conversationData || {};
+        const withConvs = new Set(convData.with_conversations || []);
+        const withoutConvUsers = users.filter(user => 
+            user.nickname !== nickname && !withConvs.has(user.nickname)
+        );
+        const withConvUsers = users.filter(user => 
+            user.nickname !== nickname && withConvs.has(user.nickname)
+        );
+    
+        // Sort with conversation priority, then online status, then activity
+        const sortUsers = (userArray) => {
+            return userArray.sort((a, b) => {
+                // Online users first within groups
+                if (a.isOnline && !b.isOnline) return -1;
+                if (!a.isOnline && b.isOnline) return 1;
+    
+                // Then by most recent activity
+                return (b.lastActivity || 0) - (a.lastActivity || 0);
+            });
+        };
+    
+        const sortedWithConv = sortUsers(withConvUsers);
+        const sortedWithoutConv = sortUsers(withoutConvUsers);
+    
+        // Clear and rebuild the list
         userList.innerHTML = '';
-        
-        // Add sorted users to the list
-        users.forEach(user => {
-            if (user.nickname === nickname) return; // Skip self
+    
+        // Add conversation groups with headers if needed
+        const addUserGroup = (users, headerText) => {
+            if (users.length === 0) return;
             
-            const userElement = document.createElement('li');
-            userElement.className = 'online-user';
-            userElement.dataset.nickname = user.nickname;
-            
-            // Add status indicator
-            const statusIndicator = document.createElement('span');
-            statusIndicator.className = `status-dot ${user.isOnline ? 'online' : 'offline'}`;
-            statusIndicator.title = user.isOnline ? 'Online' : 
-                `Last seen: ${user.lastSeen ? formatLastSeen(user.lastSeen) : 'Never'}`;
-            
-            // Add container for name
-            const nameContainer = document.createElement('div');
-            nameContainer.className = 'user-name-container';
-            nameContainer.innerHTML = `
-                <span class="user-first-name">${user.firstName}</span>
-                <span class="user-last-name">${user.lastName}</span>
-            `;
-            
-            // Add unread badge if needed
-            let badgeElement = null;
-            if (user.unread > 0) {
-                badgeElement = document.createElement("span");
-                badgeElement.className = "unread-badge";
-                badgeElement.textContent = user.unread;
+            if (headerText) {
+                const header = document.createElement('li');
+                header.className = 'section-header';
+                header.textContent = headerText;
+                userList.appendChild(header);
             }
-            
-            // Assemble the elements
-            userElement.appendChild(statusIndicator);
-            userElement.appendChild(nameContainer);
-            if (badgeElement) userElement.appendChild(badgeElement);
-            
-            userElement.onclick = () => {
-                openPrivateChat(user.nickname, user.firstName, user.lastName);
-                resetUnreadCount(user.nickname);
-            };
-            
-            userList.appendChild(userElement);
-        });
+    
+            users.forEach(user => {
+                // Create user element
+                const userElement = document.createElement('li');
+                userElement.className = 'online-user';
+                userElement.dataset.nickname = user.nickname;
+    
+                // Status indicator
+                const statusDot = document.createElement('span');
+                statusDot.className = `status-dot ${user.isOnline ? 'online' : 'offline'}`;
+                statusDot.title = user.isOnline ? 'Online' : 
+                    `Last seen: ${formatLastSeen(user.lastSeen)}`;
+    
+                // Name display
+                const nameContainer = document.createElement('div');
+                nameContainer.className = 'user-name-container';
+                nameContainer.innerHTML = `
+                    <span class="user-first-name">${user.firstName}</span>
+                    <span class="user-last-name">${user.lastName}</span>
+                `;
+    
+                // Unread badge
+                if (user.unread > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'unread-badge';
+                    badge.textContent = user.unread;
+                    userElement.appendChild(badge);
+                }
+    
+                userElement.append(statusDot, nameContainer);
+                userElement.onclick = () => {
+                    openPrivateChat(user.nickname, user.firstName, user.lastName);
+                    resetUnreadCount(user.nickname);
+                };
+    
+                userList.appendChild(userElement);
+            });
+        };
+    
+        // Add both groups with appropriate headers
+        addUserGroup(sortedWithConv, sortedWithConv.length ? 'Active Conversations' : null);
+        addUserGroup(sortedWithoutConv, 
+        sortedWithConv.length && sortedWithoutConv.length ? 'Other Users' : null);
     };
     
     const displayPrivateMessage = (data) => {
