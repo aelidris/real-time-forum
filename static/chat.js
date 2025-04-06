@@ -392,16 +392,44 @@ function setupScrollHandler(nickname) {
         chatBox.innerHTML = `
           <div class="chat-header">
             <h4>Chat with ${firstName} ${lastName}</h4>
-            <button class="close-chat" onclick="closeChat('${nickname}')">×</button>
+            <button class="close-chat">×</button>
           </div>
           <ul class="chat-messages" id="messages-${nickname}"></ul>
-          <input type="text" id="input-${nickname}" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendPrivateMessage('${nickname}')">
-          <button onclick="sendPrivateMessage('${nickname}')">Send</button>
+          <input type="text" id="input-${nickname}" placeholder="Type a message...">
+          <button>Send</button>
         `;
+        
+        // Add event listeners properly
+        const input = chatBox.querySelector(`#input-${nickname}`);
+        const sendButton = chatBox.querySelector('button');
+        const closeButton = chatBox.querySelector('.close-chat');
+        
+        input.addEventListener('keypress', (event) => handleKeyPress(event, nickname));
+        sendButton.addEventListener('click', () => sendPrivateMessage(nickname));
+        closeButton.addEventListener('click', () => closeChat(nickname));
+        
         document.getElementById("chatContainer").appendChild(chatBox);
         return chatBox;
     };
     
+    // This can be a module-scoped function now
+    function handleKeyPress(event, nickname) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            
+            // Clear any previous timeout
+            if (window.sendMessageTimeout) {
+                clearTimeout(window.sendMessageTimeout);
+            }
+            
+            // Set new timeout with 500ms delay
+            window.sendMessageTimeout = setTimeout(() => {
+                sendPrivateMessage(nickname);
+            }, 500);
+        }
+    }
+
+
     window.sendPrivateMessage = (receiver) => {
         const messageInput = document.getElementById(`input-${receiver}`);
         const message = messageInput.value.trim();
