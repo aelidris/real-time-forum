@@ -502,19 +502,19 @@ function setupScrollHandler(nickname) {
         );
     
         // Sort with conversation priority, then online status, then activity
-        const sortUsers = (userArray) => {
-            return userArray.sort((a, b) => {
-                // Online users first within groups
-                if (a.isOnline && !b.isOnline) return -1;
-                if (!a.isOnline && b.isOnline) return 1;
+        // const sortUsers = (userArray) => {
+        //     return userArray.sort((a, b) => {
+        //         // Online users first within groups
+        //         // if (a.isOnline && !b.isOnline) return -1;
+        //         // if (!a.isOnline && b.isOnline) return 1;
     
-                // Then by most recent activity
-                return (b.lastActivity || 0) - (a.lastActivity || 0);
-            });
-        };
+        //         // Then by most recent activity
+        //         return (b.lastActivity || 0) - (a.lastActivity || 0);
+        //     });
+        // };
     
-        const sortedWithConv = sortUsers(withConvUsers);
-        const sortedWithoutConv = sortUsers(withoutConvUsers);
+        const sortedWithConv = withConvUsers;
+        const sortedWithoutConv = withoutConvUsers;
     
         // Clear and rebuild the list
         userList.innerHTML = '';
