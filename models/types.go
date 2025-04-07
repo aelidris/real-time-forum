@@ -20,10 +20,10 @@ type PostWithLike struct {
 }
 
 type Comment struct {
-    CommentID  int
-    Content    string
-    CreatedAt  time.Time
-    Author     string // Add this field
+	CommentID int
+	Content   string
+	CreatedAt time.Time
+	Author    string // Add this field
 }
 
 type CommentWithLike struct {
