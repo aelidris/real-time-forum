@@ -583,7 +583,7 @@ function setupScrollHandler(nickname) {
             // Find user info from allUsers
             const userInfo = allUsers.find(user => user.nickname === chatWith);
             if (userInfo) {
-                openPrivateChat(chatWith, userInfo.firstName, userInfo.lastName);
+                // openPrivateChat(chatWith, userInfo.firstName, userInfo.lastName);
             } else {
                 // Fallback if user info not found
                 openPrivateChat(chatWith, data.firstName || chatWith, data.lastName || "");
