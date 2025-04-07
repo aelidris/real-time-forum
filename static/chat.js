@@ -576,20 +576,6 @@ function setupScrollHandler(nickname) {
     
     const displayPrivateMessage = (data) => {
         const chatWith = data.sender === nickname ? data.receiver : data.sender;
-        let chatBox = document.getElementById(`chat-${chatWith}`);
-        
-        // If chat box doesn't exist, create it
-        if (!chatBox) {
-            // Find user info from allUsers
-            const userInfo = allUsers.find(user => user.nickname === chatWith);
-            if (userInfo) {
-                // openPrivateChat(chatWith, userInfo.firstName, userInfo.lastName);
-            } else {
-                // Fallback if user info not found
-                openPrivateChat(chatWith, data.firstName || chatWith, data.lastName || "");
-            }
-            chatBox = document.getElementById(`chat-${chatWith}`);
-        }
         
         const messageList = document.getElementById(`messages-${chatWith}`);
         if (!messageList) return;
