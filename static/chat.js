@@ -401,12 +401,12 @@ function setupScrollHandler(nickname) {
           </div>
           <ul class="chat-messages" id="messages-${nickname}"></ul>
           <input type="text" id="input-${nickname}" placeholder="Type a message...">
-          <button>Send</button>
+          <button class="send-message">Send</button>
         `;
         
         // Add event listeners properly
         const input = chatBox.querySelector(`#input-${nickname}`);
-        const sendButton = chatBox.querySelector('button');
+        const sendButton = chatBox.querySelector('.send-message');
         const closeButton = chatBox.querySelector('.close-chat');
         
         input.addEventListener('keypress', (event) => handleKeyPress(event, nickname));
@@ -502,18 +502,18 @@ function setupScrollHandler(nickname) {
         );
     
         // Sort with conversation priority, then online status, then activity
-        // const sortUsers = (userArray) => {
-        //     return userArray.sort((a, b) => {
-        //         // Online users first within groups
-        //         // if (a.isOnline && !b.isOnline) return -1;
-        //         // if (!a.isOnline && b.isOnline) return 1;
+        const sortUsers = (userArray) => {
+            return userArray.sort((a, b) => {
+                // Online users first within groups
+                if (a.isOnline && !b.isOnline) return -1;
+                if (!a.isOnline && b.isOnline) return 1;
     
-        //         // Then by most recent activity
-        //         return (b.lastActivity || 0) - (a.lastActivity || 0);
-        //     });
-        // };
+                // Then by most recent activity
+                return (b.lastActivity || 0) - (a.lastActivity || 0);
+            });
+        };
     
-        const sortedWithConv = withConvUsers;
+        const sortedWithConv = sortUsers(withConvUsers);
         const sortedWithoutConv = withoutConvUsers;
     
         // Clear and rebuild the list
