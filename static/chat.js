@@ -1,152 +1,147 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const nickname = localStorage.getItem("nickname");
-    console.log("nickname from chat.js:", nickname);
+// Function to initialize chat system programmatically
+function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
+    if (!nickname) return;
+    
+    // Reset initialization state on each call
+    window.chatSystemInitialized = false;
+    
+    if (window.chatSystemInitialized) {
+        console.log("Chat system already initialized");
+        return;
+    }
+
+    window.chatSystemInitialized = true;
+
+    // Execute the same initialization code that would run on DOMContentLoaded
+    console.log("Initializing chat system for nickname:", nickname);
     
     let socket = null;
-    
-    // All global variables
-    let allUsers = []; // Store all users
-    let onlineUsers = []; // Store currently online users
-    // Track last message times and unread counts
+    let allUsers = [];
+    let onlineUsers = [];
     const userActivity = {};
     const unreadCounts = {};
     let currentOpenChat = null;
+
+    // Show loading state
+    const userList = document.getElementById("onlineUserList");
+    if (userList) {
+        userList.innerHTML = '<li class="loading">Loading users...</li>';
+    }
     
-    // Initialize the application with proper sequence
-    initializeChat();
-    
-    function initializeChat() {
-        // Show loading indicator
+    // First fetch all users
+    fetchAllUsers(nickname)
+      .then(() => {
+        // Then establish WebSocket connection
+        initializeWebSocket(nickname);
+      })
+      .catch(error => {
+        console.error('Error initializing chat:', error);
         const userList = document.getElementById("onlineUserList");
         if (userList) {
-            userList.innerHTML = '<li class="loading">Loading users...</li>';
+          userList.innerHTML = '<li class="error">Failed to load users. Please try again.</li>';
         }
-        
-        // First fetch all users
-        fetchAllUsers()
-            .then(() => {
-                // Then establish WebSocket connection
-                initializeWebSocket();
-            })
-            .catch(error => {
-                console.error('Error initializing chat:', error);
-                // Show error in user list
-                if (userList) {
-                    userList.innerHTML = '<li class="error">Failed to load users. Please try again.</li>';
-                }
-            });
+      });
+    
+    // Define all the helper functions that were in your DOMContentLoaded
+    function fetchAllUsers(nickname) {
+      return new Promise((resolve, reject) => {
+        fetch(`/get_all_users?nickname=${encodeURIComponent(nickname)}`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Server responded with ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(users => {
+            allUsers = users;
+            resolve(users);
+          })
+          .catch(error => {
+            console.error('Error fetching users:', error);
+            reject(error);
+          });
+      });
     }
     
-    function initializeWebSocket() {
-        socket = new WebSocket(`ws://localhost:8080/ws?nickname=${nickname}`);
+    function initializeWebSocket(nickname) {
+      socket = new WebSocket(`ws://localhost:8080/ws?nickname=${nickname}`);
+      
+      // ... rest of your WebSocket initialization code ...
+      // (Copy all the socket event handlers from your original code)
+      socket.onopen = () => {
+        console.log("Connected to WebSocket server");
+        // Request online users explicitly after connection
+        socket.send(JSON.stringify({
+            type: "requestOnlineUsers"
+        }));
+    };
+    
+    socket.onclose = (event) => {
+        console.log("Disconnected from WebSocket server", event.reason);
         
-        socket.onopen = () => {
-            console.log("Connected to WebSocket server");
-            // Request online users explicitly after connection
-            socket.send(JSON.stringify({
-                type: "requestOnlineUsers"
-            }));
-        };
-        
-        socket.onclose = (event) => {
-            console.log("Disconnected from WebSocket server", event.reason);
-            
-            // Update all status dots to offline if this was our own logout
-            if (event.reason === "User logged out") {
-                document.querySelectorAll('.status-dot').forEach(dot => {
-                    dot.classList.remove('online');
-                    dot.classList.add('offline');
-                });
-            }
-        };
-        
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            switch (data.type) {
-                case "onlineUsers":
-                    onlineUsers = data.users;
-                    // Store current timestamp for all online users
-                    const now = Date.now();
-                    onlineUsers.forEach(u => userActivity[u.nickname] = now);
+        // Update all status dots to offline if this was our own logout
+        if (event.reason === "User logged out") {
+            document.querySelectorAll('.status-dot').forEach(dot => {
+                dot.classList.remove('online');
+                dot.classList.add('offline');
+            });
+        }
+    };
+    
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        switch (data.type) {
+            case "onlineUsers":
+                onlineUsers = data.users;
+                // Store current timestamp for all online users
+                const now = Date.now();
+                onlineUsers.forEach(u => userActivity[u.nickname] = now);
+                updateOnlineUsersList();
+                break;
+            case "notification":
+                showNotification(data.sender);
+                break;
+                case "conversation_data":
+                    window.conversationData = data.data;
+                    console.log("Conversation data updated:", data.data);
                     updateOnlineUsersList();
                     break;
-                case "notification":
-                    showNotification(data.sender);
-                    break;
-                    case "conversation_data":
-                        window.conversationData = data.data;
-                        console.log("Conversation data updated:", data.data);
-                        updateOnlineUsersList();
-                        break;
-                default:
-                    if (data.receiver) {
-                        // Update last activity when receiving a message
-                        userActivity[data.sender] = Date.now();
-                        displayPrivateMessage(data);
-                        updateOnlineUsersList();
-                    }
-            }
-        };
-        
-        socket.onerror = (error) => {
-            console.error("WebSocket error:", error);
-        };
-    }
-    
-    function fetchAllUsers() {
-        return new Promise((resolve, reject) => {
-            fetch(`/get_all_users?nickname=${encodeURIComponent(nickname)}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Server responded with ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(users => {
-                    allUsers = users;
-                    resolve(users);
-                })
-                .catch(error => {
-                    console.error('Error fetching users:', error);
-                    reject(error);
-                });
-        });
-    }
-    
-    function handleLogout() {
-        // Close the WebSocket connection properly
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.close(1000, "User logged out");
+            default:
+                if (data.receiver) {
+                    // Update last activity when receiving a message
+                    userActivity[data.sender] = Date.now();
+                    displayPrivateMessage(data);
+                    updateOnlineUsersList();
+                }
         }
-        
-        // Immediately update UI to show offline status
-        const userElements = document.querySelectorAll('.online-user');
-        userElements.forEach(el => {
-            const statusDot = el.querySelector('.status-dot');
-            if (statusDot) {
-                statusDot.classList.remove('online');
-                statusDot.classList.add('offline');
-                statusDot.title = 'Last seen: Just now';
-            }
-        });
-        
-        // Clear local data
-        localStorage.removeItem("nickname");
-        window.location.href = "/"; // Or your preferred redirect
+    };
+    
+    socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+    };
     }
     
-    // Modify your existing logout button click handler
+    
+    // Make sure to attach the logout handler
     document.querySelector("#logoutButton")?.addEventListener("click", (e) => {
-        e.preventDefault();
-        handleLogout();
-        
-        // Optional: Notify server about logout
-        fetch('/logout', {
-            method: 'POST',
-            credentials: 'include'
-        }).catch(err => console.error('Logout API error:', err));
+      e.preventDefault();
+      handleLogout();
+      
+      fetch('/logout', {
+        method: 'POST',
+        credentials: 'include'
+      }).catch(err => console.error('Logout API error:', err));
     });
     
+    function handleLogout() {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close(1000, "User logged out");
+      }
+      
+      localStorage.removeItem("nickname");
+      window.location.href = "/";
+    }
+
     function formatLastSeen(timestamp) {
         if (!timestamp) return 'Never';
         const now = new Date();
@@ -597,11 +592,9 @@ function setupScrollHandler(nickname) {
     };
     
     window.closeChat = (nickname) => {
-        
         const chatBox = document.getElementById(`chat-${nickname}`);
         if (chatBox) chatBox.style.display = "none";
         currentOpenChat = null; // Reset the tracker
-
     };
     
     const resetUnreadCount = (nickname) => {
@@ -626,4 +619,19 @@ function setupScrollHandler(nickname) {
     window.addEventListener('beforeunload', () => {
         clearInterval(userStatusInterval);
     });
+  }
+
+  // Initialize on DOMContentLoaded if nickname exists
+document.addEventListener("DOMContentLoaded", () => {
+    const nickname = localStorage.getItem("nickname");
+    if (nickname) {
+        initializeChatSystem(nickname);
+        
+        // Show chat interface and hide login
+        document.getElementById("loginContainer").style.display = "none";
+        document.getElementById("chatContainer").style.display = "block";
+    }
 });
+
+// Make initializeChatSystem available globally for programmatic login
+window.initializeChatSystem = initializeChatSystem;

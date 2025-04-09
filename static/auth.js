@@ -21,13 +21,22 @@ document.getElementById("loginForm").addEventListener("submit", function (event)
     .then(data => {
       if (data.message) {
         this.reset();
-        window.handleAuthSuccess();
+        // Store nickname immediately
+        localStorage.setItem("nickname", data.nickname);
+        console.log("Login successful, nickname:", data.nickname);
+        
+        // Hide login form and show chat interface
+        document.getElementById("loginContainer").style.display = "none";
+        document.getElementById("chatContainer").style.display = "block";
+        
+        // Initialize chat system programmatically
+        initializeChatSystem(data.nickname);
+        
+        // Call any other success handlers
+        if (window.handleAuthSuccess) {
+          window.handleAuthSuccess();
+        }
       }
-              // After successful login
-              localStorage.setItem("nickname", data.nickname);
-              console.log(data.nickname);
-              window.location.reload();
-
     })
     .catch(error => {
       showError(errorElement, error.error || "Login failed. Please check your credentials.");
