@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showMainContent() {
     authContainer.style.display = "none";
-    mainContent.style.display = "block";
+    mainContent.style.display = "flex";
     updateAuthenticatedUI(true);
   }
 
