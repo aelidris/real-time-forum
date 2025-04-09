@@ -32,6 +32,6 @@ func main() {
 
 	go handlers.HandleMessages()
 
-	log.Println("http://localhost:8080/")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Println("http://localhost:4422/")
+	log.Fatal(http.ListenAndServe(":4422", nil))
 }

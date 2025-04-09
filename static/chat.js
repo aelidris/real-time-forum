@@ -64,7 +64,7 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     }
     
     function initializeWebSocket(nickname) {
-      socket = new WebSocket(`ws://localhost:8080/ws?nickname=${nickname}`);
+      socket = new WebSocket(`ws://localhost:4422/ws?nickname=${nickname}`);
       
       // ... rest of your WebSocket initialization code ...
       // (Copy all the socket event handlers from your original code)
