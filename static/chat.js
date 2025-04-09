@@ -79,13 +79,14 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     socket.onclose = (event) => {
         console.log("Disconnected from WebSocket server", event.reason);
         
-        // Update all status dots to offline if this was our own logout
         if (event.reason === "User logged out") {
+            // Visual feedback for offline status
             document.querySelectorAll('.status-dot').forEach(dot => {
-                dot.classList.remove('online');
-                dot.classList.add('offline');
+              dot.classList.remove('online');
+              dot.classList.add('offline');
+              dot.title = 'Offline';
             });
-        }
+          }
     };
     
     socket.onmessage = (event) => {
@@ -123,24 +124,24 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     
     
     // Make sure to attach the logout handler
-    document.querySelector("#logoutButton")?.addEventListener("click", (e) => {
-      e.preventDefault();
-      handleLogout();
+    // document.querySelector("#logoutButton")?.addEventListener("click", (e) => {
+    //   e.preventDefault();
+    //   handleLogout();
       
-      fetch('/logout', {
-        method: 'POST',
-        credentials: 'include'
-      }).catch(err => console.error('Logout API error:', err));
-    });
+    //   fetch('/logout', {
+    //     method: 'POST',
+    //     credentials: 'include'
+    //   }).catch(err => console.error('Logout API error:', err));
+    // });
     
-    function handleLogout() {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.close(1000, "User logged out");
-      }
+    // function handleLogout() {
+    //   if (socket && socket.readyState === WebSocket.OPEN) {
+    //     socket.close(1000, "User logged out");
+    //   }
       
-      localStorage.removeItem("nickname");
-      window.location.href = "/";
-    }
+    //   localStorage.removeItem("nickname");
+    //   window.location.href = "/";
+    // }
 
     function formatLastSeen(timestamp) {
         if (!timestamp) return 'Never';

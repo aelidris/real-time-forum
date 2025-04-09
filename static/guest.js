@@ -94,19 +94,54 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Logout handler
-  logoutButton.addEventListener("click", () => {
-    fetch("/logout", {
+  // Enhanced Logout handler with state synchronization
+logoutButton.addEventListener("click", async (e) => {
+  e.preventDefault();
+  
+  // Add loading state
+  const originalText = logoutButton.textContent;
+  logoutButton.disabled = true;
+  logoutButton.textContent = "Logging out...";
+
+  try {
+    // 1. Close WebSocket connection gracefully
+    if (window.chatSystem?.socket) {
+      window.chatSystem.socket.close(1000, "User logged out");
+      // Wait briefly for close to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // 2. Send logout request
+    const response = await fetch("/logout", {
       method: "POST",
-      credentials: "include",
-    })
-    .then(response => {
-      if (response.ok) {
-        showAuthForms();
-        window.scrollTo(0, 0);
-      }
-    })
-    .catch(error => console.error("Logout failed:", error));
-  });
+      credentials: "include"
+    });
+
+    if (!response.ok) throw new Error("Logout failed");
+
+    // 3. Clear client-side state
+    localStorage.removeItem("nickname");
+    window.chatSystem = null;
+
+    // 4. Reset UI completely
+    showAuthForms();
+    window.scrollTo(0, 0);
+    
+    // 5. Force server state sync with a soft reload
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
+    
+  } catch (error) {
+    console.error("Logout error:", error);
+    // 6. Fallback to hard reload if something went wrong
+    window.location.href = "/";
+  } finally {
+    logoutButton.textContent = originalText;
+    logoutButton.disabled = false;
+  }
+});
+
 
   // Initial check
   checkSession();
