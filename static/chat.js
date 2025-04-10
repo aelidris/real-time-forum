@@ -66,8 +66,6 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     function initializeWebSocket(nickname) {
       socket = new WebSocket(`ws://localhost:4422/ws?nickname=${nickname}`);
       
-      // ... rest of your WebSocket initialization code ...
-      // (Copy all the socket event handlers from your original code)
       socket.onopen = () => {
         console.log("Connected to WebSocket server");
         // Request online users explicitly after connection
@@ -121,27 +119,6 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
         console.error("WebSocket error:", error);
     };
     }
-    
-    
-    // Make sure to attach the logout handler
-    // document.querySelector("#logoutButton")?.addEventListener("click", (e) => {
-    //   e.preventDefault();
-    //   handleLogout();
-      
-    //   fetch('/logout', {
-    //     method: 'POST',
-    //     credentials: 'include'
-    //   }).catch(err => console.error('Logout API error:', err));
-    // });
-    
-    // function handleLogout() {
-    //   if (socket && socket.readyState === WebSocket.OPEN) {
-    //     socket.close(1000, "User logged out");
-    //   }
-      
-    //   localStorage.removeItem("nickname");
-    //   window.location.href = "/";
-    // }
 
     function formatLastSeen(timestamp) {
         if (!timestamp) return 'Never';
@@ -434,6 +411,7 @@ function setupScrollHandler(nickname) {
     window.sendPrivateMessage = (receiver) => {
         const messageInput = document.getElementById(`input-${receiver}`);
         const message = messageInput.value.trim();
+        
         if (message && socket && socket.readyState === WebSocket.OPEN) {
             const data = {
                 sender: nickname,
@@ -441,7 +419,12 @@ function setupScrollHandler(nickname) {
                 content: message,
                 timestamp: new Date().toLocaleTimeString(),
             };
+            
+            // Send the message
             socket.send(JSON.stringify(data));
+            
+            // Clear the input immediately (no need to wait for server response)
+            messageInput.value = "";
             
             // Display the message in sender's UI immediately
             displayPrivateMessage({ 
@@ -450,11 +433,9 @@ function setupScrollHandler(nickname) {
                 lastName: "" 
             });
             
-            messageInput.value = "";
-            
-            // Force update sender's contact list
+            // Update activity and UI
             userActivity[receiver] = Date.now();
-            updateOnlineUsersList(); // This will re-sort contacts
+            updateOnlineUsersList(); // This will move the user to "Active Conversations" if needed
             
             resetUnreadCount(receiver);
         } else if (!message) {
@@ -574,19 +555,35 @@ function setupScrollHandler(nickname) {
         const chatWith = data.sender === nickname ? data.receiver : data.sender;
         
         const messageList = document.getElementById(`messages-${chatWith}`);
-        if (!messageList) return;
+        
         
         // Update the last activity time for this user (current timestamp)
         userActivity[chatWith] = Date.now();
         
-        // If message is received and chat is not open, show notification
-        if (data.sender !== nickname && !document.getElementById(`chat-${chatWith}`)?.style.display === "block") {
-            showNotification(data.sender);
+        // Add the message to the chat if it exists
+        if (messageList) {
+            const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
+            messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
+            messageList.scrollTop = messageList.scrollHeight;
         }
         
-        const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
-        messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
-        messageList.scrollTop = messageList.scrollHeight;
+        // Update conversation data to include this user
+        if (!window.conversationData) {
+            window.conversationData = { with_conversations: [] };
+        }
+        
+        // Add user to conversations if not already there
+        if (!window.conversationData.with_conversations.includes(chatWith)) {
+            window.conversationData.with_conversations.push(chatWith);
+            
+            // Notify server about the new conversation
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: "update_conversations",
+                    with_conversations: window.conversationData.with_conversations
+                }));
+            }
+        }
         
         // Update the online users list for both sender and receiver
         updateOnlineUsersList();
