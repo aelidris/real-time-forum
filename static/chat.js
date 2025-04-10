@@ -65,7 +65,7 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     
     function initializeWebSocket(nickname) {
       socket = new WebSocket(`ws://localhost:4422/ws?nickname=${nickname}`);
-      
+
       socket.onopen = () => {
         console.log("Connected to WebSocket server");
         // Request online users explicitly after connection
@@ -92,22 +92,19 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
         switch (data.type) {
             case "onlineUsers":
                 onlineUsers = data.users;
-                // Store current timestamp for all online users
-                const now = Date.now();
-                onlineUsers.forEach(u => userActivity[u.nickname] = now);
+                // Don't update lastActivity for connections!
                 updateOnlineUsersList();
                 break;
             case "notification":
                 showNotification(data.sender);
                 break;
-                case "conversation_data":
-                    window.conversationData = data.data;
-                    console.log("Conversation data updated:", data.data);
-                    updateOnlineUsersList();
-                    break;
+            case "conversation_data":
+                window.conversationData = data.data;
+                updateOnlineUsersList();
+                break;
             default:
                 if (data.receiver) {
-                    // Update last activity when receiving a message
+                    // Only update lastActivity for actual messages
                     userActivity[data.sender] = Date.now();
                     displayPrivateMessage(data);
                     updateOnlineUsersList();
@@ -447,109 +444,107 @@ function setupScrollHandler(nickname) {
     };
     
     const updateOnlineUsersList = () => {
-        // Combine online status with all users data
-        const combinedUsers = allUsers.map(user => {
-            const isOnline = onlineUsers.some(u => u.nickname === user.nickname);
-            const lastActivity = userActivity[user.nickname] || 0;
-            const unread = unreadCounts[user.nickname] || 0;
-            
-            return {
-                ...user,
-                isOnline,
-                lastActivity,
-                unread
-            };
-        });
+    // Combine online status with all users data
+    const combinedUsers = allUsers.map(user => {
+        const isOnline = onlineUsers.some(u => u.nickname === user.nickname);
+        const lastActivity = userActivity[user.nickname] || 0;
+        const unread = unreadCounts[user.nickname] || 0;
         
-        updateOnlineUsers(combinedUsers);
-    };
-    
-    const updateOnlineUsers = (users) => {
-        const userList = document.getElementById("onlineUserList");
-        if (!userList) return;
-    
-        // Get conversation data if available
-        const convData = window.conversationData || {};
-        const withConvs = new Set(convData.with_conversations || []);
-        const withoutConvUsers = users.filter(user => 
-            user.nickname !== nickname && !withConvs.has(user.nickname)
-        );
-        const withConvUsers = users.filter(user => 
-            user.nickname !== nickname && withConvs.has(user.nickname)
-        );
-    
-        // Sort with conversation priority, then online status, then activity
-        const sortUsers = (userArray) => {
-            return userArray.sort((a, b) => {
-                // Online users first within groups
-                if (a.isOnline && !b.isOnline) return -1;
-                if (!a.isOnline && b.isOnline) return 1;
-    
-                // Then by most recent activity
-                return (b.lastActivity || 0) - (a.lastActivity || 0);
-            });
+        return {
+            ...user,
+            isOnline,
+            lastActivity,
+            unread
         };
-    
-        const sortedWithConv = sortUsers(withConvUsers);
-        const sortedWithoutConv = withoutConvUsers;
-    
-        // Clear and rebuild the list
-        userList.innerHTML = '';
-    
-        // Add conversation groups with headers if needed
-        const addUserGroup = (users, headerText) => {
-            if (users.length === 0) return;
-            
-            if (headerText) {
-                const header = document.createElement('li');
-                header.className = 'section-header';
-                header.textContent = headerText;
-                userList.appendChild(header);
-            }
-    
-            users.forEach(user => {
-                // Create user element
-                const userElement = document.createElement('li');
-                userElement.className = 'online-user';
-                userElement.dataset.nickname = user.nickname;
-    
-                // Status indicator
-                const statusDot = document.createElement('span');
-                statusDot.className = `status-dot ${user.isOnline ? 'online' : 'offline'}`;
-                statusDot.title = user.isOnline ? 'Online' : 
-                    `Last seen: ${formatLastSeen(user.lastSeen)}`;
-    
-                // Name display
-                const nameContainer = document.createElement('div');
-                nameContainer.className = 'user-name-container';
-                nameContainer.innerHTML = `
-                    <span class="user-first-name">${user.firstName}</span>
-                    <span class="user-last-name">${user.lastName}</span>
-                `;
-    
-                // Unread badge
-                if (user.unread > 0) {
-                    const badge = document.createElement('span');
-                    badge.className = 'unread-badge';
-                    badge.textContent = user.unread;
-                    userElement.appendChild(badge);
-                }
-    
-                userElement.append(statusDot, nameContainer);
-                userElement.onclick = () => {
-                    openPrivateChat(user.nickname, user.firstName, user.lastName);
-                    resetUnreadCount(user.nickname);
-                };
-    
-                userList.appendChild(userElement);
-            });
-        };
-    
-        // Add both groups with appropriate headers
-        addUserGroup(sortedWithConv, sortedWithConv.length ? 'Active Conversations' : null);
-        addUserGroup(sortedWithoutConv, 
-        sortedWithConv.length && sortedWithoutConv.length ? 'Other Users' : null);
+    });
+
+    updateOnlineUsers(combinedUsers);
+};
+
+const updateOnlineUsers = (users) => {
+    const userList = document.getElementById("onlineUserList");
+    if (!userList) return;
+
+    const convData = window.conversationData || { with_conversations: [] };
+    const withConvs = new Set(convData.with_conversations || []);
+
+    // Split users into groups
+    const withConvUsers = users.filter(user => 
+        user.nickname !== nickname && withConvs.has(user.nickname)
+    );
+    const withoutConvUsers = users.filter(user => 
+        user.nickname !== nickname && !withConvs.has(user.nickname)
+    );
+
+    // Sort active conversations by last message time (not connection time)
+    const sortedWithConv = withConvUsers.sort((a, b) => 
+        (b.lastActivity || 0) - (a.lastActivity || 0)
+    );
+
+    // Sort other users alphabetically (unchanged)
+    const sortedWithoutConv = withoutConvUsers.sort((a, b) => 
+        a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' })
+    );
+
+    // Clear and rebuild list
+    userList.innerHTML = '';
+
+    // Add active conversations
+    if (sortedWithConv.length > 0) {
+        const header = document.createElement('li');
+        header.className = 'section-header';
+        header.textContent = 'Active Conversations';
+        userList.appendChild(header);
+
+        sortedWithConv.forEach(user => createUserElement(user));
+    }
+
+    // Add other users
+    if (sortedWithoutConv.length > 0) {
+        const header = document.createElement('li');
+        header.className = 'section-header';
+        header.textContent = sortedWithConv.length > 0 ? 'Other Users' : 'All Users';
+        userList.appendChild(header);
+
+        sortedWithoutConv.forEach(user => createUserElement(user));
+    }
+};
+
+// Helper function to create consistent user list items
+function createUserElement(user) {
+    const userElement = document.createElement('li');
+    userElement.className = 'online-user';
+    userElement.dataset.nickname = user.nickname;
+
+    // Status indicator
+    const statusDot = document.createElement('span');
+    statusDot.className = `status-dot ${user.isOnline ? 'online' : 'offline'}`;
+    statusDot.title = user.isOnline ? 'Online' : `Last seen: ${formatLastSeen(user.lastSeen)}`;
+
+    // Name display
+    const nameContainer = document.createElement('div');
+    nameContainer.className = 'user-name-container';
+    nameContainer.innerHTML = `
+        <span class="user-first-name">${user.firstName}</span>
+        <span class="user-last-name">${user.lastName}</span>
+    `;
+
+    // Unread badge
+    if (user.unread > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'unread-badge';
+        badge.textContent = user.unread;
+        userElement.appendChild(badge);
+    }
+
+    userElement.append(statusDot, nameContainer);
+    userElement.onclick = () => {
+        openPrivateChat(user.nickname, user.firstName, user.lastName);
+        resetUnreadCount(user.nickname);
     };
+
+    document.getElementById("onlineUserList").appendChild(userElement);
+}
     
     const displayPrivateMessage = (data) => {
         const chatWith = data.sender === nickname ? data.receiver : data.sender;
