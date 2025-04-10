@@ -481,10 +481,18 @@ const updateOnlineUsers = (users) => {
         (b.lastActivity || 0) - (a.lastActivity || 0)
     );
 
-    // Sort other users alphabetically (unchanged)
-    const sortedWithoutConv = withoutConvUsers.sort((a, b) => 
-        a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' })
-    );
+    // Sort other users by last activity (if any) then alphabetically
+    const sortedWithoutConv = withoutConvUsers.sort((a, b) => {
+        // If both have activity, sort by most recent
+        if (a.lastActivity && b.lastActivity) {
+            return b.lastActivity - a.lastActivity;
+        }
+        // If only one has activity, put that first
+        if (a.lastActivity) return -1;
+        if (b.lastActivity) return 1;
+        // Otherwise sort alphabetically
+        return a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' });
+    });
 
     // Clear and rebuild list
     userList.innerHTML = '';
@@ -546,43 +554,45 @@ function createUserElement(user) {
     document.getElementById("onlineUserList").appendChild(userElement);
 }
     
-    const displayPrivateMessage = (data) => {
-        const chatWith = data.sender === nickname ? data.receiver : data.sender;
+const displayPrivateMessage = (data) => {
+    const chatWith = data.sender === nickname ? data.receiver : data.sender;
+    
+    const messageList = document.getElementById(`messages-${chatWith}`);
+    
+    // Update the last activity time for this user (current timestamp)
+    userActivity[chatWith] = Date.now();
+    
+    // Add the message to the chat if it exists
+    if (messageList) {
+        const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
+        messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
+        messageList.scrollTop = messageList.scrollHeight;
+    }
+    
+    // Update conversation data to include this user
+    if (!window.conversationData) {
+        window.conversationData = { with_conversations: [] };
+    }
+    
+    // Add user to conversations if not already there
+    if (!window.conversationData.with_conversations.includes(chatWith)) {
+        window.conversationData.with_conversations.push(chatWith);
         
-        const messageList = document.getElementById(`messages-${chatWith}`);
-        
-        
-        // Update the last activity time for this user (current timestamp)
-        userActivity[chatWith] = Date.now();
-        
-        // Add the message to the chat if it exists
-        if (messageList) {
-            const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
-            messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
-            messageList.scrollTop = messageList.scrollHeight;
+        // Notify server about the new conversation
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: "update_conversations",
+                with_conversations: window.conversationData.with_conversations
+            }));
         }
         
-        // Update conversation data to include this user
-        if (!window.conversationData) {
-            window.conversationData = { with_conversations: [] };
-        }
-        
-        // Add user to conversations if not already there
-        if (!window.conversationData.with_conversations.includes(chatWith)) {
-            window.conversationData.with_conversations.push(chatWith);
-            
-            // Notify server about the new conversation
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: "update_conversations",
-                    with_conversations: window.conversationData.with_conversations
-                }));
-            }
-        }
-        
-        // Update the online users list for both sender and receiver
+        // Force immediate UI update when a new conversation starts
         updateOnlineUsersList();
-    };
+    } else {
+        // Even if user is already in conversations, update the list to reorder by activity
+        updateOnlineUsersList();
+    }
+};
     
     window.closeChat = (nickname) => {
         const chatBox = document.getElementById(`chat-${nickname}`);
