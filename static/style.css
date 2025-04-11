@@ -201,10 +201,6 @@ a:hover {
   width: 100%;
 }
 
-/* .main-content.authenticated {
-  display: block;
-} */
-
 .content-wrapper {
   display: grid;
   grid-template-columns: minmax(250px, 1fr) minmax(0, 3fr);
@@ -987,7 +983,7 @@ button:disabled {
 }
 
 /* Responsive Adjustments */
-@media (max-width: 992px) {
+@media (max-width: 500px) {
   .content-wrapper {
     grid-template-columns: 1fr;
   }
@@ -1108,5 +1104,3 @@ button:disabled {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   }
 }
-
-/* Accessibility Improvements */

@@ -164,78 +164,59 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
         }
     };
     
-// Message loading system with reliable counting
-let isLoading = false;
-let allMessagesLoaded = false;
-let currentOffset = 0;
+    let isLoading = false;
+    let allMessagesLoaded = false;
+    let currentOffset = 0;
 
-function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
-    const limit = 10;
-    const messageList = document.getElementById(`messages-${otherNickname}`);
-    if (!messageList) return;
+    function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
+        const limit = 10;
+        const messageList = document.getElementById(`messages-${otherNickname}`);
+        if (!messageList) return;
 
-    // Reset state for initial load
-    if (!append) {
-        messageList.innerHTML = '<li class="loading-message">Loading messages...</li>';
-        currentOffset = 0;
-        allMessagesLoaded = false;
-    } 
-    // Show loading indicator for appended messages
-    else if (append && !isLoading && !allMessagesLoaded) {
-        const loadingIndicator = document.createElement('li');
-        loadingIndicator.className = 'loading-message';
-        loadingIndicator.textContent = 'Loading more messages...';
-        messageList.insertBefore(loadingIndicator, messageList.firstChild);
+        if (!append) {
+            messageList.innerHTML = '<li class="loading-message">Loading messages...</li>';
+            currentOffset = 0;
+            allMessagesLoaded = false;
+        } 
+
+        else if (append && !isLoading && !allMessagesLoaded) {
+            const loadingIndicator = document.createElement('li');
+            loadingIndicator.className = 'loading-message';
+            loadingIndicator.textContent = 'Loading more messages...';
+            messageList.insertBefore(loadingIndicator, messageList.firstChild);
+        }
+
+        if (isLoading || allMessagesLoaded ) return;
+
+        isLoading = true;
+
+        fetch(`/fetch_messages?nickname=${encodeURIComponent(nickname)}&otherUser=${encodeURIComponent(otherNickname)}&offset=${offset}&limit=${limit}`)
+        .then(response => response.json())
+        .then(data => {     
+            console.log(data);
+
+            if ((Array.isArray(data) && data.length === 0)) {
+                allMessagesLoaded = true;
+                return;
+            }
+
+            const messages = Array.isArray(data) ? data : [];
+
+            displayMessages(messages, messageList, append);
+
+            currentOffset += messages.length;
+
+            if (messages.length < limit) {
+                allMessagesLoaded = true;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading messages:', error);
+        })
+        .finally(() => {
+            isLoading = false;
+        });
     }
-
-    // Don't load if already loading or all messages loaded
-    if (isLoading || allMessagesLoaded) return;
-
-    isLoading = true;
-
-    fetch(`/fetch_messages?nickname=${encodeURIComponent(nickname)}&otherUser=${encodeURIComponent(otherNickname)}&offset=${offset}&limit=${limit}`)
-    .then(response => {
-        if (!response.ok) {
-            // Handle 404 or no messages differently from other errors
-            if (response.status === 404) {
-                return { noMoreMessages: true };
-            }
-            throw new Error(`Server returned ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        // Handle "no messages" response
-        if (data.noMoreMessages || (Array.isArray(data) && data.length === 0)) {
-            allMessagesLoaded = true;
-            showNoMoreMessages(messageList, append);
-            return;
-        }
-
-        const messages = Array.isArray(data) ? data : [];
-        
-        // Process and display messages
-        displayMessages(messages, messageList, append);
-        
-        // Update offset for next load
-        currentOffset += messages.length;
-        
-        // Check if we've reached the end
-        if (messages.length < limit) {
-            allMessagesLoaded = true;
-            if (messages.length === 0) {
-                showNoMoreMessages(messageList, append);
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error loading messages:', error);
-        showErrorMessage(messageList, error, append);
-    })
-    .finally(() => {
-        isLoading = false;
-    });
-}
 
 function displayMessages(messages, messageList, append) {
     // Remove loading indicator
@@ -276,22 +257,22 @@ function displayMessages(messages, messageList, append) {
     }
 }
 
-function showNoMoreMessages(messageList, append) {
-    const noMoreMsg = document.createElement('li');
-    noMoreMsg.className = 'info-message';
-    noMoreMsg.textContent = 'No more messages';
+// function showNoMoreMessages(messageList, append) {
+//     const noMoreMsg = document.createElement('li');
+//     noMoreMsg.className = 'info-message';
+//     noMoreMsg.textContent = 'No more messages';
     
-    if (append) {
-        // Remove loading indicator if exists
-        const loadingIndicator = messageList.querySelector('.loading-message');
-        if (loadingIndicator) messageList.removeChild(loadingIndicator);
+//     if (append) {
+//         // Remove loading indicator if exists
+//         const loadingIndicator = messageList.querySelector('.loading-message');
+//         if (loadingIndicator) messageList.removeChild(loadingIndicator);
         
-        messageList.insertBefore(noMoreMsg, messageList.firstChild);
-    } else {
-        messageList.innerHTML = '';
-        messageList.appendChild(noMoreMsg);
-    }
-}
+//         messageList.insertBefore(noMoreMsg, messageList.firstChild);
+//     } else {
+//         messageList.innerHTML = '';
+//         messageList.appendChild(noMoreMsg);
+//     }
+// }
 
 function showErrorMessage(messageList, error, append) {
     const errorElement = document.createElement('li');
@@ -555,43 +536,54 @@ function createUserElement(user) {
 }
     
 const displayPrivateMessage = (data) => {
+    if (!data || !data.sender || !data.receiver) {
+        console.warn('Invalid message data received');
+        return;
+    }
+
     const chatWith = data.sender === nickname ? data.receiver : data.sender;
-    
     const messageList = document.getElementById(`messages-${chatWith}`);
     
-    // Update the last activity time for this user (current timestamp)
-    userActivity[chatWith] = Date.now();
-    
+    // Update the last activity time for this user
+    if (chatWith) {
+        userActivity[chatWith] = Date.now();
+    }
+
     // Add the message to the chat if it exists
     if (messageList) {
-        const displayName = data.sender === nickname ? "You" : `${data.firstName} ${data.lastName}`;
-        messageList.innerHTML += `<li class="${data.sender === nickname ? "sent-message" : "received-message"}">[${data.timestamp}] ${displayName}: ${data.content}</li>`;
+        const displayName = data.sender === nickname 
+            ? "You" 
+            : `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Unknown';
+        
+        messageList.innerHTML += `
+            <li class="${data.sender === nickname ? "sent-message" : "received-message"}">
+                [${data.timestamp || 'No timestamp'}] ${displayName}: ${data.content || ''}
+            </li>`;
         messageList.scrollTop = messageList.scrollHeight;
     }
+
+    // Initialize conversation data if it doesn't exist
+    window.conversationData = window.conversationData || { with_conversations: [] };
     
-    // Update conversation data to include this user
-    if (!window.conversationData) {
-        window.conversationData = { with_conversations: [] };
-    }
+    // Safely access the conversations array
+    const conversations = window.conversationData.with_conversations || [];
     
     // Add user to conversations if not already there
-    if (!window.conversationData.with_conversations.includes(chatWith)) {
-        window.conversationData.with_conversations.push(chatWith);
+    if (chatWith && !conversations.includes(chatWith)) {
+        conversations.push(chatWith);
+        window.conversationData.with_conversations = conversations;
         
         // Notify server about the new conversation
-        if (socket && socket.readyState === WebSocket.OPEN) {
+        if (socket?.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 type: "update_conversations",
-                with_conversations: window.conversationData.with_conversations
+                with_conversations: conversations
             }));
         }
-        
-        // Force immediate UI update when a new conversation starts
-        updateOnlineUsersList();
-    } else {
-        // Even if user is already in conversations, update the list to reorder by activity
-        updateOnlineUsersList();
     }
+
+    // Always update the UI to reflect recent activity
+    updateOnlineUsersList();
 };
     
     window.closeChat = (nickname) => {
