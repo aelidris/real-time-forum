@@ -29,8 +29,16 @@ document.getElementById("loginForm").addEventListener("submit", function (event)
         document.getElementById("loginContainer").style.display = "none";
         document.getElementById("chatContainer").style.display = "block";
         
-        // Initialize chat system programmatically
+        // Initialize chat system programmatically immediately
         initializeChatSystem(data.nickname);
+        
+        // Set up interval to reinitialize every 10 seconds
+        const chatRefreshInterval = setInterval(() => {
+          initializeChatSystem(data.nickname);
+        }, 10000); // 10000 milliseconds = 10 seconds
+        
+        // Store the interval ID so you can clear it later if needed
+        localStorage.setItem("chatRefreshInterval", chatRefreshInterval);
         
         // Call any other success handlers
         if (window.handleAuthSuccess) {
