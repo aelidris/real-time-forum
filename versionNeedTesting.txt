@@ -1,0 +1,544 @@
+package handlers
+
+import (
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
+	"forum/database"
+
+	"github.com/gorilla/websocket"
+)
+
+type Message struct {
+	Sender          string `json:"sender"`
+	Receiver        string `json:"receiver"`
+	Content         string `json:"content"`
+	Timestamp       string `json:"timestamp"`
+	SenderFirstName string `json:"firstName"`
+	SenderLastName  string `json:"lastName"`
+}
+
+type Client struct {
+	conn      *websocket.Conn
+	firstName string
+	lastName  string
+	nickname  string
+	send      chan interface{}
+}
+
+type User struct {
+	ID        int    `json:"id"`
+	Nickname  string `json:"nickname"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	IsOnline  bool   `json:"isOnline"`
+	LastSeen  string `json:"lastSeen,omitempty"`
+}
+
+// WebSocket message types
+type WebSocketMessage struct {
+	Type    string      `json:"type"`
+	Payload interface{} `json:"payload"`
+}
+
+var (
+	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	clients  = make(map[*websocket.Conn]*Client)
+	mu       sync.Mutex
+)
+
+func HandleConnections(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("WebSocket upgrade error:", err)
+		return
+	}
+
+	nickname := r.URL.Query().Get("nickname")
+	if nickname == "" {
+		conn.Close()
+		return
+	}
+
+	if err := updateUserStatus(nickname, true); err != nil {
+		log.Println("Error updating user status:", err)
+		conn.Close()
+		return
+	}
+
+	// Get the user's ID based on nickname
+	userID, err := getUserIDByNickname(nickname)
+	if err != nil {
+		log.Println("Error getting user ID:", err)
+		conn.Close()
+		return
+	}
+
+	client, err := createClient(conn, nickname)
+	if err != nil {
+		log.Println("Error creating client:", err)
+		conn.Close()
+		return
+	}
+
+	mu.Lock()
+	clients[conn] = client
+	mu.Unlock()
+
+	// Start goroutine for writing messages to this client
+	go writeMessages(client)
+
+	// Broadcast online users to all clients
+	broadcastOnlineUsers()
+
+	// Send initial data to the client
+	sendInitialData(client, userID)
+
+	// Handle incoming messages in a separate goroutine
+	go handleIncomingMessages(client, conn, nickname, userID)
+}
+
+func writeMessages(client *Client) {
+	defer func() {
+		client.conn.Close()
+	}()
+
+	for message := range client.send {
+		if err := client.conn.WriteJSON(message); err != nil {
+			log.Println("Error writing message:", err)
+			break
+		}
+	}
+}
+
+func handleIncomingMessages(client *Client, conn *websocket.Conn, nickname string, userID int) {
+	defer func() {
+		// Cleanup when this goroutine exits
+		cleanupClient(conn, nickname)
+	}()
+
+	for {
+		var wsMsg WebSocketMessage
+		if err := conn.ReadJSON(&wsMsg); err != nil {
+			log.Println("Error reading message:", err)
+			break
+		}
+
+		switch wsMsg.Type {
+		case "chat_message":
+			handleChatMessage(wsMsg.Payload, client)
+		case "fetch_messages":
+			handleFetchMessages(wsMsg.Payload, client, userID)
+		case "get_all_users":
+			handleGetAllUsers(client, nickname)
+		case "get_conversations":
+			handleGetConversations(client, userID)
+		default:
+			log.Printf("Unknown message type: %s\n", wsMsg.Type)
+		}
+	}
+}
+
+func handleChatMessage(payload interface{}, client *Client) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Println("Error marshaling message payload:", err)
+		return
+	}
+
+	var msg Message
+	if err := json.Unmarshal(data, &msg); err != nil {
+		log.Println("Error unmarshaling message:", err)
+		return
+	}
+
+	// Set sender first name and last name
+	msg.SenderFirstName = client.firstName
+	msg.SenderLastName = client.lastName
+	msg.Sender = client.nickname
+
+	// Set timestamp if not already set
+	if msg.Timestamp == "" {
+		msg.Timestamp = time.Now().Format(time.RFC3339)
+	}
+
+	// Save message to database
+	if msg.Receiver != "" {
+		saveMessage(msg.Sender, msg.Receiver, msg.Content)
+
+		// Send message to sender for confirmation
+		client.send <- WebSocketMessage{
+			Type:    "chat_message",
+			Payload: msg,
+		}
+
+		// Send to receiver
+		sendPrivateMessage(msg)
+	}
+}
+
+func handleFetchMessages(payload interface{}, client *Client, userID int) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Println("Error marshaling fetch payload:", err)
+		return
+	}
+
+	var params struct {
+		OtherUser string `json:"otherUser"`
+		Offset    string `json:"offset"`
+		Limit     string `json:"limit"`
+	}
+	if err := json.Unmarshal(data, &params); err != nil {
+		log.Println("Error unmarshaling fetch params:", err)
+		return
+	}
+
+	// Set default values if not provided
+	if params.Offset == "" {
+		params.Offset = "0"
+	}
+	if params.Limit == "" {
+		params.Limit = "50"
+	}
+
+	messages, err := queryMessages(client.nickname, params.OtherUser, params.Offset, params.Limit)
+	if err != nil {
+		log.Println("Error fetching messages:", err)
+		client.send <- WebSocketMessage{
+			Type:    "error",
+			Payload: "Failed to fetch messages: " + err.Error(),
+		}
+		return
+	}
+
+	client.send <- WebSocketMessage{
+		Type:    "message_history",
+		Payload: messages,
+	}
+}
+
+func handleGetAllUsers(client *Client, nickname string) {
+	users, err := queryUsers(nickname)
+	if err != nil {
+		log.Println("Error querying users:", err)
+		client.send <- WebSocketMessage{
+			Type:    "error",
+			Payload: "Failed to get users: " + err.Error(),
+		}
+		return
+	}
+
+	client.send <- WebSocketMessage{
+		Type:    "all_users",
+		Payload: users,
+	}
+}
+
+func handleGetConversations(client *Client, userID int) {
+	// Get users who have conversations with this user
+	usersWithConversations, err := getUsersWithConversations(userID)
+	if err != nil {
+		log.Println("Error getting conversation users:", err)
+		client.send <- WebSocketMessage{
+			Type:    "error",
+			Payload: "Failed to get conversations: " + err.Error(),
+		}
+		return
+	}
+
+	// Get users who don't have conversations with this user
+	usersWithoutConversations, err := getUsersWithoutConversations(userID)
+	if err != nil {
+		log.Println("Error getting non-conversation users:", err)
+		client.send <- WebSocketMessage{
+			Type:    "error",
+			Payload: "Failed to get users without conversations: " + err.Error(),
+		}
+		return
+	}
+
+	client.send <- WebSocketMessage{
+		Type: "conversation_data",
+		Payload: map[string]interface{}{
+			"with_conversations":    usersWithConversations,
+			"without_conversations": usersWithoutConversations,
+		},
+	}
+}
+
+// Get user ID from nickname
+func getUserIDByNickname(nickname string) (int, error) {
+	var id int
+	err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", nickname).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// Get users who have conversations with the given user
+func getUsersWithConversations(userID int) ([]string, error) {
+	query := `
+        SELECT DISTINCT u.nickname 
+        FROM users u
+        JOIN chats c ON u.id = c.sender_id OR u.id = c.receiver_id
+        WHERE (c.sender_id = ? OR c.receiver_id = ?) AND u.id != ?
+    `
+	rows, err := database.DB.Query(query, userID, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nicknames []string
+	for rows.Next() {
+		var nickname string
+		if err := rows.Scan(&nickname); err != nil {
+			return nil, err
+		}
+		nicknames = append(nicknames, nickname)
+	}
+	return nicknames, nil
+}
+
+// Get users who don't have conversations with the given user
+func getUsersWithoutConversations(userID int) ([]string, error) {
+	query := `
+        SELECT u.nickname 
+        FROM users u
+        WHERE u.id != ? AND u.id NOT IN (
+            SELECT DISTINCT CASE 
+                WHEN c.sender_id = ? THEN c.receiver_id 
+                ELSE c.sender_id 
+            END
+            FROM chats c
+            WHERE c.sender_id = ? OR c.receiver_id = ?
+        )
+    `
+	rows, err := database.DB.Query(query, userID, userID, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nicknames []string
+	for rows.Next() {
+		var nickname string
+		if err := rows.Scan(&nickname); err != nil {
+			return nil, err
+		}
+		nicknames = append(nicknames, nickname)
+	}
+	return nicknames, nil
+}
+
+func updateUserStatus(nickname string, online bool) error {
+	_, err := database.DB.Exec(`
+		INSERT OR REPLACE INTO user_status (user_id, is_online, last_seen)
+		SELECT id, ?, CURRENT_TIMESTAMP FROM users WHERE nickname = ?`,
+		online, nickname)
+	return err
+}
+
+func createClient(conn *websocket.Conn, nickname string) (*Client, error) {
+	var firstName, lastName string
+	err := database.DB.QueryRow(
+		"SELECT first_name, last_name FROM users WHERE nickname = ?", nickname,
+	).Scan(&firstName, &lastName)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{
+		conn:      conn,
+		firstName: firstName,
+		lastName:  lastName,
+		nickname:  nickname,
+		send:      make(chan interface{}, 256), // Buffered channel for sending messages
+	}, nil
+}
+
+func cleanupClient(conn *websocket.Conn, nickname string) {
+	mu.Lock()
+	client, exists := clients[conn]
+	if exists {
+		close(client.send)
+		delete(clients, conn)
+	}
+	mu.Unlock()
+
+	if err := updateUserStatus(nickname, false); err != nil {
+		log.Println("Error updating user status to offline:", err)
+	}
+
+	// Broadcast updated online users list after a client disconnects
+	broadcastOnlineUsers()
+}
+
+func sendInitialData(client *Client, userID int) {
+	// Get users who have conversations with this user
+	usersWithConversations, err := getUsersWithConversations(userID)
+	if err != nil {
+		log.Println("Error getting conversation users:", err)
+	}
+
+	// Get users who don't have conversations with this user
+	usersWithoutConversations, err := getUsersWithoutConversations(userID)
+	if err != nil {
+		log.Println("Error getting non-conversation users:", err)
+	}
+
+	// Send conversation data to the client
+	client.send <- WebSocketMessage{
+		Type: "conversation_data",
+		Payload: map[string]interface{}{
+			"with_conversations":    usersWithConversations,
+			"without_conversations": usersWithoutConversations,
+		},
+	}
+
+	// Also send the list of all users
+	users, err := queryUsers(client.nickname)
+	if err != nil {
+		log.Println("Error querying users:", err)
+	} else {
+		client.send <- WebSocketMessage{
+			Type:    "all_users",
+			Payload: users,
+		}
+	}
+}
+
+func queryUsers(currentUser string) ([]User, error) {
+	rows, err := database.DB.Query(`
+		SELECT u.id, u.nickname, u.first_name, u.last_name, 
+			CASE WHEN s.is_online THEN 1 ELSE 0 END as is_online, s.last_seen
+		FROM users u LEFT JOIN user_status s ON u.id = s.user_id
+		WHERE u.nickname != ? ORDER BY CASE WHEN s.is_online THEN 0 ELSE 1 END, u.first_name, u.last_name`,
+		currentUser)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var user User
+		var lastSeen sql.NullString
+		if err := rows.Scan(&user.ID, &user.Nickname, &user.FirstName, &user.LastName, &user.IsOnline, &lastSeen); err != nil {
+			return nil, err
+		}
+		if lastSeen.Valid {
+			user.LastSeen = lastSeen.String
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+func saveMessage(sender, receiver, content string) {
+	var senderID, receiverID int
+	if err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", sender).Scan(&senderID); err != nil {
+		log.Println("Error getting sender ID:", err)
+		return
+	}
+	if err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", receiver).Scan(&receiverID); err != nil {
+		log.Println("Error getting receiver ID:", err)
+		return
+	}
+	if _, err := database.DB.Exec("INSERT INTO chats (sender_id, receiver_id, message, sent_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)", senderID, receiverID, content); err != nil {
+		log.Println("Error saving message:", err)
+	}
+}
+
+func broadcastOnlineUsers() {
+	mu.Lock()
+	userList := make([]map[string]string, 0, len(clients))
+	for _, client := range clients {
+		userList = append(userList, map[string]string{
+			"nickname":  client.nickname,
+			"firstName": client.firstName,
+			"lastName":  client.lastName,
+		})
+	}
+	mu.Unlock()
+
+	message := WebSocketMessage{
+		Type:    "online_users",
+		Payload: userList,
+	}
+
+	mu.Lock()
+	for _, client := range clients {
+		select {
+		case client.send <- message:
+			// Message sent successfully
+		default:
+			// Channel buffer is full, client might be slow or disconnected
+			close(client.send)
+			delete(clients, client.conn)
+		}
+	}
+	mu.Unlock()
+}
+
+func sendPrivateMessage(msg Message) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	for _, client := range clients {
+		if client.nickname == msg.Receiver {
+			// Send message to receiver
+			client.send <- WebSocketMessage{
+				Type:    "chat_message",
+				Payload: msg,
+			}
+
+			// Send notification
+			client.send <- WebSocketMessage{
+				Type: "notification",
+				Payload: map[string]string{
+					"sender": msg.Sender,
+				},
+			}
+			break
+		}
+	}
+}
+
+func queryMessages(currentUser, otherUser, offset, limit string) ([]Message, error) {
+	rows, err := database.DB.Query(`
+		SELECT u_sender.nickname, u_receiver.nickname, chats.message, chats.sent_at, 
+			u_sender.first_name, u_sender.last_name
+		FROM chats
+		JOIN users u_sender ON chats.sender_id = u_sender.id
+		JOIN users u_receiver ON chats.receiver_id = u_receiver.id
+		WHERE (u_sender.nickname = ? AND u_receiver.nickname = ?) OR 
+			(u_sender.nickname = ? AND u_receiver.nickname = ?)
+		ORDER BY chats.sent_at DESC
+		LIMIT ? OFFSET ?`,
+		currentUser, otherUser, otherUser, currentUser, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []Message
+	for rows.Next() {
+		var msg Message
+		if err := rows.Scan(&msg.Sender, &msg.Receiver, &msg.Content, &msg.Timestamp, &msg.SenderFirstName, &msg.SenderLastName); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, msg)
+	}
+
+	// Reverse the array so oldest messages appear first
+	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
+		msgs[i], msgs[j] = msgs[j], msgs[i]
+	}
+	return msgs, nil
+}
