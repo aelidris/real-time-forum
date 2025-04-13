@@ -28,6 +28,8 @@ func main() {
 	http.HandleFunc("/get_all_users", handlers.GetAllUsersHandler)
 	http.HandleFunc("/fetch_messages", handlers.FetchMessagesHandler)
 	http.HandleFunc("/ws", handlers.HandleConnections)
+	http.HandleFunc("/mark-read", handlers.MarkNotificationsRead)
+	http.HandleFunc("/get-notifications", handlers.GetNotifications)
 
 	go handlers.HandleMessages()
 

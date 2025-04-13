@@ -70,7 +70,7 @@ func BroadcastNewUser(nickname, firstName, lastName string) {
 	for conn, client := range clients {
 		if err := client.SendJSON(msg); err != nil {
 			log.Printf("Broadcast error: %v", err)
-			client.Conn().Close() 
+			client.Conn().Close()
 			delete(clients, conn)
 		}
 	}
@@ -99,6 +99,20 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println("Error getting user ID:", err)
 		return
+	}
+
+	// Fetch and send pending notifications on connection
+	notifications, err := fetchUnreadNotifications(nickname)
+	if err != nil {
+		log.Println("Error fetching notifications:", err)
+	} else {
+		for _, notif := range notifications {
+			// Send each notification
+			if err := conn.WriteJSON(notif); err != nil {
+				log.Printf("Failed to send pending notification to %s: %v", nickname, err)
+				continue
+			}
+		}
 	}
 
 	// Get users who have conversations with this user
@@ -149,7 +163,7 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			mu.Unlock()
 			break
 		}
-	
+
 		saveMessage(msg.Sender, msg.Receiver, msg.Content)
 		if msg.Receiver != "" {
 			sendPrivateMessage(msg)
@@ -167,6 +181,90 @@ func getUserIDByNickname(nickname string) (int, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+func fetchUnreadNotifications(nickname string) ([]map[string]interface{}, error) {
+	rows, err := database.DB.Query(`
+        SELECT 
+            n.id,
+            u.nickname as sender
+        FROM notifications n
+        JOIN users u ON n.sender_id = u.id
+        WHERE n.user_id = (SELECT id FROM users WHERE nickname = ?)
+        ORDER BY n.created_at DESC`,
+		nickname)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var notifications []map[string]interface{}
+	for rows.Next() {
+		var id int
+		var sender string
+		if err := rows.Scan(&id, &sender); err != nil {
+			return nil, err
+		}
+		notifications = append(notifications, map[string]interface{}{
+			"type":   "notification",
+			"sender": sender,
+			"db_id":  id, // For marking as read later
+		})
+	}
+	return notifications, nil
+}
+
+func MarkNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Receiver string `json:"receiver"`
+		Sender   string `json:"sender"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// DELETE instead of UPDATE
+	_, err := database.DB.Exec(`
+        DELETE FROM notifications 
+        WHERE user_id = (SELECT id FROM users WHERE nickname = ?)
+        AND sender_id = (SELECT id FROM users WHERE nickname = ?)`,
+		request.Receiver, request.Sender)
+	if err != nil {
+		http.Error(w, "Deletion failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func GetNotifications(w http.ResponseWriter, r *http.Request) {
+	nickname := r.URL.Query().Get("nickname")
+
+	// ONLY return truly unread notifications
+	rows, err := database.DB.Query(`
+		SELECT n.id, u.nickname as sender
+		FROM notifications n
+		JOIN users u ON n.sender_id = u.id
+		WHERE n.user_id = (SELECT id FROM users WHERE nickname = ?)
+		AND n.is_read = FALSE  // Critical: Only unread!
+		ORDER BY n.created_at DESC`,
+		nickname)
+	if err != nil {
+		log.Println("Error getting unread notifications users:", err)
+		return
+	}
+	defer rows.Close()
+
+	notifications, err := fetchUnreadNotifications(nickname) // Use your existing function
+	if err != nil {
+		http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(notifications)
 }
 
 // Get users who have conversations with the given user
@@ -351,6 +449,18 @@ func sendPrivateMessage(msg Message) {
 		}
 	}
 
+	_, err := database.DB.Exec(`
+		INSERT INTO notifications (user_id, sender_id) 
+		VALUES (
+			(SELECT id FROM users WHERE nickname = ?), 
+			(SELECT id FROM users WHERE nickname = ?)
+		)`,
+		msg.Receiver, msg.Sender)
+	if err != nil {
+		log.Println("failed to store notification: ", err)
+		return
+	}
+
 	for _, client := range clients {
 		if client.nickname == msg.Receiver {
 			if err := client.conn.WriteJSON(msg); err != nil {
@@ -371,6 +481,14 @@ func sendNotification(receiver, sender string) {
 				"sender": sender,
 			}); err != nil {
 				log.Println("Error sending notification:", err)
+			} else {
+				// Mark as read if successfully delivered
+				database.DB.Exec(`
+                    UPDATE notifications 
+                    SET is_read = true 
+                    WHERE user_id = (SELECT id FROM users WHERE nickname = ?)
+                    AND sender_id = (SELECT id FROM users WHERE nickname = ?)`,
+					receiver, sender)
 			}
 			break
 		}

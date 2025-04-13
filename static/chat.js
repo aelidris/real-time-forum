@@ -62,6 +62,15 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     function initializeWebSocket(nickname) {
       socket = new WebSocket(`ws://localhost:4422/ws?nickname=${nickname}`);
 
+      // Fetch notifications when page loads
+      fetch(`/get-notifications?nickname=${nickname}`)
+      .then(response => response.json())
+      .then(notifications => {
+          notifications.forEach(notif => {
+              console.log("Unread from:", notif.sender);
+          });
+      });
+
       socket.onopen = () => {
         console.log("Connected to WebSocket server");
         // Request online users explicitly after connection
@@ -175,7 +184,7 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     let allMessagesLoaded = false;
     let currentOffset = 0;
 
-    function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
+    async function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
         const limit = 10;
         const messageList = document.getElementById(`messages-${otherNickname}`);
         if (!messageList) return;
@@ -287,27 +296,37 @@ function setupScrollHandler(nickname) {
 }
     
     
-    window.openPrivateChat = (nickname, firstName, lastName) => {
-        // Close the currently open chat (if any)
-        if (currentOpenChat) {
-            window.closeChat(currentOpenChat);
-        }
+    window.openPrivateChat = async (nickname, firstName, lastName) => {
 
-        // Open the new chat
-        let chatBox = document.getElementById(`chat-${nickname}`) || createChatBox(nickname, firstName, lastName);
-        chatBox.style.display = "block";
-        
-        // Fetch initial messages (last 10)
-        fetchHistoricalMessages(nickname);
-        
-        // Setup scroll handler for infinite loading
-        setupScrollHandler(nickname);
-        
-        // Update the currently open chat
-        currentOpenChat = nickname;
-        
-        // Reset unread count
-        resetUnreadCount(nickname);
+        const recieverOfNoti = localStorage.getItem("nickname") 
+        try {
+            await fetch('/mark-read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    receiver: recieverOfNoti, 
+                    sender: nickname              
+                })
+            });
+    
+            if (currentOpenChat) {
+                window.closeChat(currentOpenChat);
+            }
+    
+            const chatBox = document.getElementById(`chat-${nickname}`) || 
+            createChatBox(nickname, firstName, lastName);
+            
+            chatBox.style.display = "block";
+            currentOpenChat = nickname;
+            
+            await fetchHistoricalMessages(nickname);
+            setupScrollHandler(nickname);
+            resetUnreadCount(nickname);
+    
+        } catch (error) {
+            console.error("Chat opening failed:", error);
+            showToast("Failed to open chat");
+        }
     };
     
     const createChatBox = (nickname, firstName, lastName) => {
@@ -339,7 +358,7 @@ function setupScrollHandler(nickname) {
     function handleKeyPress(event, nickname) {
         if (event.key === 'Enter') {
             event.preventDefault();
-                        if (window.sendMessageTimeout) {
+                if (window.sendMessageTimeout) {
                 clearTimeout(window.sendMessageTimeout);
             }
             window.sendMessageTimeout = setTimeout(() => {

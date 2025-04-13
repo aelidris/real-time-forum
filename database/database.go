@@ -196,11 +196,30 @@ func createTables() error {
 
 	_, err = DB.Exec(`
     	CREATE TABLE IF NOT EXISTS user_status (
-		user_id INTEGER PRIMARY KEY,
-		is_online BOOLEAN NOT NULL DEFAULT FALSE,
-		last_seen DATETIME,
-		FOREIGN KEY (user_id) REFERENCES users(id)
-	);
+			user_id INTEGER PRIMARY KEY,
+			is_online BOOLEAN NOT NULL DEFAULT FALSE,
+			last_seen DATETIME,
+			FOREIGN KEY (user_id) REFERENCES users(id)
+		);
+	`)
+	if err != nil {
+		log.Printf("Error creating 'user_status' table: %v", err)
+		return err
+	} else {
+		log.Println("'user_status' table created or already exists")
+	}
+
+	_, err = DB.Exec(`
+    	CREATE TABLE IF NOT EXISTS notifications (
+    		id INTEGER PRIMARY KEY AUTOINCREMENT,
+    		user_id INTEGER NOT NULL,          -- Who receives the notification
+    		sender_id INTEGER NOT NULL,        -- Who triggered it
+    		is_read BOOLEAN DEFAULT FALSE,     -- Simple read/unread status
+    		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    		FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+		);
 	`)
 	if err != nil {
 		log.Printf("Error creating 'user_status' table: %v", err)
