@@ -101,8 +101,34 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
       if (data.message) {
         this.reset();
         document.getElementById("confirmPassword").value = "";
-        switchToLoginTab();
-        showSuccess("Registration successful! Please login.");
+        
+        // Automatically log in with the new credentials
+        return fetch("/login", {
+          method: "POST",
+          body: new URLSearchParams({
+            email: formData.get("email"),
+            password: password
+          })
+        }).then(handleResponse);
+      }
+    })
+    .then(loginData => {
+      if (loginData && loginData.message) {
+        // Store nickname immediately
+        localStorage.setItem("nickname", loginData.nickname);
+        console.log("Login successful, nickname:", loginData.nickname);
+        
+        // Hide login form and show chat interface
+        document.getElementById("loginContainer").style.display = "none";
+        document.getElementById("chatContainer").style.display = "block";
+        
+        // Initialize chat system programmatically
+        initializeChatSystem(loginData.nickname);
+        
+        // Call any other success handlers
+        if (window.handleAuthSuccess) {
+          window.handleAuthSuccess();
+        }
       }
     })
     .catch(error => {
@@ -142,25 +168,6 @@ function showError(element, message) {
   element.textContent = message;
   element.style.display = "block";
   element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function showSuccess(message) {
-  const successElement = document.createElement("div");
-  successElement.className = "auth-message success";
-  successElement.textContent = message;
-  
-  const authHeader = document.querySelector(".auth-header");
-  authHeader.insertAdjacentElement("afterend", successElement);
-  
-  setTimeout(() => successElement.remove(), 3000);
-}
-
-function switchToLoginTab() {
-  document.querySelectorAll(".auth-tabs button").forEach(tab => {
-    if (tab.dataset.form === "login") {
-      tab.click();
-    }
-  });
 }
 
 function capitalize(string) {

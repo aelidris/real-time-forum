@@ -1,6 +1,4 @@
 async function submitLikeDislike({ postID = null, commentID = null, isLike }) {
-  // console.log("likeBtn ID:", `like-btn-${commentID || postID}`);
-
   if (!postID && !commentID) {
     console.error("Either postID or commentID is required");
     return;
@@ -80,9 +78,6 @@ async function submitLikeDislike({ postID = null, commentID = null, isLike }) {
       // Update button states
       toggleButtons(likeBtnID, dislikeBtnID, updatedIsLike);
 
-      // console.log(
-      //   `Updated counts: likeCount=${newLikeCount}, dislikeCount=${newDislikeCount}`
-      // );
     } else {
       console.error("Backend error:", await response.text());
       alert("Failed to submit interaction. Please try again.");

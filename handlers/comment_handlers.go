@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"forum/auth"
 	"forum/database"
 	"forum/models"
 	"forum/utils"
@@ -18,7 +17,7 @@ import (
 )
 
 func ShowComments(postID int, w http.ResponseWriter, r *http.Request) ([]models.CommentWithLike, error) {
-	_, sessionToken, _, err := auth.RequireLogin(w, r)
+	_, sessionToken, _, err := RequireLogin(w, r)
 	if err != nil {
 		fmt.Println("Error in cookie:", err)
 		http.Error(w, "Unauthorized access. Please log in.", http.StatusUnauthorized)
@@ -44,7 +43,7 @@ func ShowComments(postID int, w http.ResponseWriter, r *http.Request) ([]models.
 		var commentWithLike models.CommentWithLike
 		var commentID int
 		var createdAt time.Time
-		
+
 		err = commentRows.Scan(&commentID, &c.Content, &createdAt, &c.Author)
 		if err != nil {
 			log.Printf("Error scanning comment: %v", err)
@@ -104,7 +103,7 @@ func ShowComments(postID int, w http.ResponseWriter, r *http.Request) ([]models.
 }
 
 func CommentSubmit(w http.ResponseWriter, r *http.Request) {
-	_, sessionToken, loggedIn, _ := auth.RequireLogin(w, r)
+	_, sessionToken, loggedIn, _ := RequireLogin(w, r)
 	response := make(map[string]interface{})
 
 	if !loggedIn {

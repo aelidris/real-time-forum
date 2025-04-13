@@ -38,5 +38,4 @@ func GetCategories(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error encoding categories to JSON: %v", err)
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
-	// fmt.Println(categories)
 }

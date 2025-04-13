@@ -44,6 +44,38 @@ var (
 	mu       sync.Mutex
 )
 
+// this method to safely access the connection
+func (c *Client) Conn() *websocket.Conn {
+	return c.conn
+}
+
+// this method to send JSON
+func (c *Client) SendJSON(v interface{}) error {
+	return c.conn.WriteJSON(v)
+}
+
+func BroadcastNewUser(nickname, firstName, lastName string) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	msg := map[string]interface{}{
+		"type": "userRegistered",
+		"user": map[string]string{
+			"nickname":  nickname,
+			"firstName": firstName,
+			"lastName":  lastName,
+		},
+	}
+
+	for conn, client := range clients {
+		if err := client.SendJSON(msg); err != nil {
+			log.Printf("Broadcast error: %v", err)
+			client.Conn().Close() 
+			delete(clients, conn)
+		}
+	}
+}
+
 func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -117,7 +149,7 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			mu.Unlock()
 			break
 		}
-
+	
 		saveMessage(msg.Sender, msg.Receiver, msg.Content)
 		if msg.Receiver != "" {
 			sendPrivateMessage(msg)

@@ -1,4 +1,4 @@
-package auth
+package handlers
 
 import (
 	"database/sql"
@@ -209,7 +209,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the last inserted user ID
 	userID, err := result.LastInsertId()
 	if err != nil {
 		log.Printf("Error retrieving last insert ID: %v", err)
@@ -217,17 +216,19 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add the user to the chats table (if needed)
+	// Add the user to the chat with a welcome message to chats
 	_, err = database.DB.Exec(`
-		INSERT INTO chats (sender_id, receiver_id, message, sent_at, meta_data)
-		VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)`,
-		userID, 0, "Welcome to the chat!", nickname) // Assuming receiver_id 0 is for system messages
+        INSERT INTO chats (sender_id, receiver_id, message, sent_at, meta_data)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)`,
+		userID, 0, "Welcome to the chat!", nickname)
 	if err != nil {
 		log.Printf("Error inserting user into chat table: %v", err)
 		response = map[string]string{"error": "Chat registration failed"}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	BroadcastNewUser(nickname, firstName, lastName)
 
 	response = map[string]string{"message": "Registration successful! Please log in."}
 	w.Header().Set("Content-Type", "application/json")

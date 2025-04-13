@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 
-	"forum/auth"
 	"forum/database"
 	"forum/handlers"
 )
@@ -22,10 +21,10 @@ func main() {
 	http.HandleFunc("/comment_submit", handlers.CommentSubmit)
 	http.HandleFunc("/interact", handlers.HandleInteract)
 	http.HandleFunc("/get_categories", handlers.GetCategories)
-	http.HandleFunc("/login", auth.LoginHandler)
-	http.HandleFunc("/check-session", auth.CheckSessionHandler)
-	http.HandleFunc("/logout", auth.LogoutHandler)
-	http.HandleFunc("/register", auth.RegisterHandler)
+	http.HandleFunc("/login", handlers.LoginHandler)
+	http.HandleFunc("/check-session", handlers.CheckSessionHandler)
+	http.HandleFunc("/logout", handlers.LogoutHandler)
+	http.HandleFunc("/register", handlers.RegisterHandler)
 	http.HandleFunc("/get_all_users", handlers.GetAllUsersHandler)
 	http.HandleFunc("/fetch_messages", handlers.FetchMessagesHandler)
 	http.HandleFunc("/ws", handlers.HandleConnections)

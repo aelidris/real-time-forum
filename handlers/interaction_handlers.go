@@ -7,12 +7,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"forum/auth"
 	"forum/database"
 )
 
 func HandleInteract(w http.ResponseWriter, r *http.Request) {
-	_, sessionToken, loggedIn, _ := auth.RequireLogin(w, r)
+	_, sessionToken, loggedIn, _ := RequireLogin(w, r)
 	if !loggedIn {
 		http.Error(w, "Unauthorized: User is not logged in", http.StatusUnauthorized)
 		return

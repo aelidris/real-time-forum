@@ -1,4 +1,3 @@
-// Function to initialize chat system programmatically
 function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     if (!nickname) return;
     
@@ -11,10 +10,7 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     }
 
     window.chatSystemInitialized = true;
-
-    // Execute the same initialization code that would run on DOMContentLoaded
-    console.log("Initializing chat system for nickname:", nickname);
-    
+ 
     let socket = null;
     let allUsers = [];
     let onlineUsers = [];
@@ -90,27 +86,38 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         switch (data.type) {
-            case "onlineUsers":
-                onlineUsers = data.users;
-                // Don't update lastActivity for connections!
+            case "userRegistered":
+            const newUser = data.user;
+            if (!allUsers.some(u => u.nickname === newUser.nickname)) {
+                allUsers.push({
+                    nickname: newUser.nickname,
+                    firstName: newUser.firstName,
+                    lastName: newUser.lastName,
+                    isOnline: false
+                });
                 updateOnlineUsersList();
-                break;
-            case "notification":
-                showNotification(data.sender);
-                break;
-            case "conversation_data":
-                window.conversationData = data.data;
-                updateOnlineUsersList();
-                break;
-            default:
-                if (data.receiver) {
-                    // Only update lastActivity for actual messages
-                    userActivity[data.sender] = Date.now();
-                    displayPrivateMessage(data);
-                    updateOnlineUsersList();
-                }
+            }
+            break;
+          case "onlineUsers":
+            onlineUsers = data.users;
+            updateOnlineUsersList();
+            break;
+          case "notification":
+            showNotification(data.sender);
+            break;
+          case "conversation_data":
+            window.conversationData = data.data;
+            updateOnlineUsersList();
+            break;
+          default:
+            if (data.receiver) {
+              // Only update lastActivity for actual messages
+              userActivity[data.sender] = Date.now();
+              displayPrivateMessage(data);
+              updateOnlineUsersList();
+            }
         }
-    };
+      };
     
     socket.onerror = (error) => {
         console.error("WebSocket error:", error);
@@ -257,42 +264,6 @@ function displayMessages(messages, messageList, append) {
     }
 }
 
-// function showNoMoreMessages(messageList, append) {
-//     const noMoreMsg = document.createElement('li');
-//     noMoreMsg.className = 'info-message';
-//     noMoreMsg.textContent = 'No more messages';
-    
-//     if (append) {
-//         // Remove loading indicator if exists
-//         const loadingIndicator = messageList.querySelector('.loading-message');
-//         if (loadingIndicator) messageList.removeChild(loadingIndicator);
-        
-//         messageList.insertBefore(noMoreMsg, messageList.firstChild);
-//     } else {
-//         messageList.innerHTML = '';
-//         messageList.appendChild(noMoreMsg);
-//     }
-// }
-
-function showErrorMessage(messageList, error, append) {
-    const errorElement = document.createElement('li');
-    errorElement.className = 'error-message';
-    errorElement.textContent = `Error: ${error.message}`;
-    
-    if (append) {
-        // Replace loading indicator with error
-        const loadingIndicator = messageList.querySelector('.loading-message');
-        if (loadingIndicator) {
-            messageList.replaceChild(errorElement, loadingIndicator);
-        } else {
-            messageList.insertBefore(errorElement, messageList.firstChild);
-        }
-    } else {
-        messageList.innerHTML = '';
-        messageList.appendChild(errorElement);
-    }
-}
-
 function setupScrollHandler(nickname) {
     const messageList = document.getElementById(`messages-${nickname}`);
     if (!messageList) return;
@@ -316,14 +287,12 @@ function setupScrollHandler(nickname) {
 }
     
     
-    // Make these functions globally available
     window.openPrivateChat = (nickname, firstName, lastName) => {
         // Close the currently open chat (if any)
         if (currentOpenChat) {
             window.closeChat(currentOpenChat);
-
         }
-        
+
         // Open the new chat
         let chatBox = document.getElementById(`chat-${nickname}`) || createChatBox(nickname, firstName, lastName);
         chatBox.style.display = "block";
@@ -355,7 +324,6 @@ function setupScrollHandler(nickname) {
           <button class="send-message">Send</button>
         `;
         
-        // Add event listeners properly
         const input = chatBox.querySelector(`#input-${nickname}`);
         const sendButton = chatBox.querySelector('.send-message');
         const closeButton = chatBox.querySelector('.close-chat');
@@ -368,17 +336,12 @@ function setupScrollHandler(nickname) {
         return chatBox;
     };
     
-    // This can be a module-scoped function now
     function handleKeyPress(event, nickname) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            
-            // Clear any previous timeout
-            if (window.sendMessageTimeout) {
+                        if (window.sendMessageTimeout) {
                 clearTimeout(window.sendMessageTimeout);
             }
-            
-            // Set new timeout with 500ms delay
             window.sendMessageTimeout = setTimeout(() => {
                 sendPrivateMessage(nickname);
             }, 500);
@@ -398,13 +361,10 @@ function setupScrollHandler(nickname) {
                 timestamp: new Date().toLocaleTimeString(),
             };
             
-            // Send the message
             socket.send(JSON.stringify(data));
             
-            // Clear the input immediately (no need to wait for server response)
             messageInput.value = "";
             
-            // Display the message in sender's UI immediately
             displayPrivateMessage({ 
                 ...data, 
                 firstName: "You", 
@@ -414,7 +374,6 @@ function setupScrollHandler(nickname) {
             // Update activity and UI
             userActivity[receiver] = Date.now();
             updateOnlineUsersList(); // This will move the user to "Active Conversations" if needed
-            
             resetUnreadCount(receiver);
         } else if (!message) {
             console.log("Empty message, not sending");
@@ -429,14 +388,27 @@ function setupScrollHandler(nickname) {
     const combinedUsers = allUsers.map(user => {
         const isOnline = onlineUsers.some(u => u.nickname === user.nickname);
         const lastActivity = userActivity[user.nickname] || 0;
-        const unread = unreadCounts[user.nickname] || 0;
-        
+        const unread = unreadCounts[user.nickname] || 0; 
         return {
             ...user,
             isOnline,
             lastActivity,
             unread
         };
+    });
+
+    // Check if we have any online users not in allUsers (newly registered)
+    onlineUsers.forEach(onlineUser => {
+      if (!allUsers.some(user => user.nickname === onlineUser.nickname)) {
+        combinedUsers.push({
+          nickname: onlineUser.nickname,
+          firstName: onlineUser.firstName,
+          lastName: onlineUser.lastName,
+          isOnline: true,
+          lastActivity: Date.now(),
+          unread: 0
+        });
+      }
     });
 
     updateOnlineUsers(combinedUsers);

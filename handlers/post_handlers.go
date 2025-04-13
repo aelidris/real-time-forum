@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"forum/auth"
+	
 	"forum/database"
 	"forum/models"
 	"forum/utils"
@@ -68,7 +68,7 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, sessionToken, _, err := auth.RequireLogin(w, r)
+	_, sessionToken, _, err := RequireLogin(w, r)
 	if err != nil {
 		response["error"] = "Unauthorized access. Please log in."
 		w.WriteHeader(http.StatusUnauthorized)
@@ -222,7 +222,7 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 
 // Updated PostSubmit handler
 func PostSubmit(w http.ResponseWriter, r *http.Request) {
-	nickname, sessionToken, loggedIn, _ := auth.RequireLogin(w, r) // Changed variable name
+	nickname, sessionToken, loggedIn, _ := RequireLogin(w, r) // Changed variable name
 	response := make(map[string]interface{})
 
 	if !loggedIn {
