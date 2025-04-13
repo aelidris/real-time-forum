@@ -334,13 +334,16 @@ function setupScrollHandler(nickname) {
         chatBox.id = `chat-${nickname}`;
         chatBox.className = "private-chat";
         chatBox.innerHTML = `
-          <div class="chat-header">
-            <h4>Chat with ${firstName} ${lastName}</h4>
-            <button class="close-chat">×</button>
-          </div>
-          <ul class="chat-messages" id="messages-${nickname}"></ul>
-          <input type="text" id="input-${nickname}" placeholder="Type a message...">
-          <button class="send-message">Send</button>
+            <div class="chat-header">
+              <h4>Chat with ${firstName} ${lastName}</h4>
+              <button class="close-chat">×</button>
+            </div>
+            <div class="typing-container"></div>
+            <ul class="chat-messages" id="messages-${nickname}"></ul>
+            <div class="chat-input-container"> <!-- New container div -->
+              <input type="text" id="input-${nickname}" placeholder="Type a message...">
+              <button class="send-message">Send</button>
+            </div>
         `;
         
         const input = chatBox.querySelector(`#input-${nickname}`);

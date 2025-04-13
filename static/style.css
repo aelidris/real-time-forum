@@ -951,7 +951,39 @@ button:disabled {
   padding: 12px 15px;
   border-top: 1px solid #eee;
   background-color: var(--white);
+  gap: 8px;
 }
+
+input[id^="input-"] {
+  flex-grow: 1; 
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+input[id^="input-"]:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+}
+
+.send-message {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 0 1.5rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap; /* Prevents text wrapping */
+}
+
+.send-message:hover {
+  background-color: var(--primary-dark);
+}
+
 
 .chat-input {
   flex-grow: 1;
