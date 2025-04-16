@@ -1,10 +1,20 @@
 package handlers
 
 import (
-    "fmt"
-    "log"
-    "regexp"
+	"fmt"
+	"log"
+	"regexp"
+	"unicode"
 )
+
+func isLetter(s string) bool {
+	for _, char := range s {
+		if !unicode.IsLetter(char) {
+			return false
+		}
+	}
+	return true
+}
 
 func ValidateInput(nickname, email, password, firstName, lastName string, age int, gender string) (map[string]string, bool) {
 	errors := make(map[string]string)
@@ -19,7 +29,11 @@ func ValidateInput(nickname, email, password, firstName, lastName string, age in
 		errors["nickname"] = "Nickname cannot be empty"
 	} else if len(nickname) > maxNickname {
 		errors["nickname"] = fmt.Sprintf("Nickname cannot be longer than %d characters", maxNickname)
+	} else if !isLetter(nickname) {
+		errors["nickname"] = "Nickname should combined with just letters (a-z) (A-Z)"
 	}
+
+	
 
 	// Email validation
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
