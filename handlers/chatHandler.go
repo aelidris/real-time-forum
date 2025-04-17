@@ -408,21 +408,21 @@ func saveMessage(sender, receiver, content string) {
 }
 
 func broadcastOnlineUsers() {
-	message := map[string]interface{}{
-		"type":  "onlineUsers",
-		"users": make([]map[string]string, 0, len(clients)),
-	}
-
+	userList := make([]map[string]string, 0, len(clients))
 	for _, client := range clients {
-		userData := map[string]string{
+		userList = append(userList, map[string]string{
 			"nickname":  client.nickname,
 			"firstName": client.firstName,
 			"lastName":  client.lastName,
-		}
-		if client.conn == nil {
-			continue
-		}
-		message["users"] = append(message["users"].([]map[string]string), userData)
+		})
+	}
+
+	message := map[string]interface{}{
+		"type":  "onlineUsers",
+		"users": userList,
+	}
+
+	for _, client := range clients {
 		if err := client.conn.WriteJSON(message); err != nil {
 			client.conn.Close()
 			delete(clients, client.conn)

@@ -604,7 +604,7 @@ const displayPrivateMessage = (data) => {
     });
   }
 
-  // Initialize on DOMContentLoaded if nickname exists
+// this part for fiw when the page reloaded to save the list of users ... 
 document.addEventListener("DOMContentLoaded", () => {
     const nickname = localStorage.getItem("nickname");
     if (nickname) {
