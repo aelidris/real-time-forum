@@ -28,7 +28,7 @@ func RequireLogin(w http.ResponseWriter, r *http.Request) (string, string, bool,
 			http.SetCookie(w, &http.Cookie{
 				Name:    cookie.Name,
 				Value:   "",
-				Expires: time.Now().Add(-1 * time.Hour),
+				Expires: time.Now().Add(1 * time.Hour),
 			})
 		}
 		return "", "guest", false, err
