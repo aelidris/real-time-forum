@@ -7,9 +7,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var DB *sql.DB // Exported DB variable
+var DB *sql.DB
 
-// InitDB initializes the database and creates tables
 func InitDB() error {
 	var err error
 	DB, err = sql.Open("sqlite3", "./forum.db")
@@ -44,11 +43,8 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'users' table: %v", err)
 		return err
-	} else {
-		log.Println("'users' table created or already exists")
 	}
 
-	// Rest of the tables remain the same
 	// Posts table
 	_, err = DB.Exec(`
         CREATE TABLE IF NOT EXISTS posts (
@@ -63,8 +59,6 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'posts' table: %v", err)
 		return err
-	} else {
-		log.Println("'posts' table created or already exists")
 	}
 
 	// Categories table
@@ -77,11 +71,9 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'categories' table: %v", err)
 		return err
-	} else {
-		log.Println("'categories' table created or already exists")
 	}
 
-	// Post categories relationship table
+	// Post categories
 	_, err = DB.Exec(`
         CREATE TABLE IF NOT EXISTS post_categories (
             post_id INTEGER NOT NULL,
@@ -94,8 +86,6 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'post_categories' table: %v", err)
 		return err
-	} else {
-		log.Println("'post_categories' table created or already exists")
 	}
 
 	// Comments table
@@ -113,8 +103,6 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'comments' table: %v", err)
 		return err
-	} else {
-		log.Println("'comments' table created or already exists")
 	}
 
 	// post_likes table
@@ -133,8 +121,6 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'post_likes' table: %v", err)
 		return err
-	} else {
-		log.Println("'post_likes' table created or already exists")
 	}
 
 	// comment_likes table
@@ -153,8 +139,6 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'comment_likes' table: %v", err)
 		return err
-	} else {
-		log.Println("'comment_likes' table created or already exists")
 	}
 
 	// Insert default categories
@@ -170,8 +154,6 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error inserting default categories: %v", err)
 		return err
-	} else {
-		log.Println("Default categories inserted or already exist")
 	}
 
 	// table using for the chat between users
@@ -190,10 +172,7 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'chats' table: %v", err)
 		return err
-	} else {
-		log.Println("'chats' table created or already exists")
 	}
-
 	_, err = DB.Exec(`
     	CREATE TABLE IF NOT EXISTS user_status (
 			user_id INTEGER PRIMARY KEY,
@@ -205,10 +184,7 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'user_status' table: %v", err)
 		return err
-	} else {
-		log.Println("'user_status' table created or already exists")
 	}
-
 	_, err = DB.Exec(`
     	CREATE TABLE IF NOT EXISTS notifications (
     		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -224,8 +200,6 @@ func createTables() error {
 	if err != nil {
 		log.Printf("Error creating 'user_status' table: %v", err)
 		return err
-	} else {
-		log.Println("'user_status' table created or already exists")
 	}
 
 	return nil

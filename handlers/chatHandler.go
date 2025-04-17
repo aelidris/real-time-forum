@@ -3,7 +3,6 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -120,16 +119,12 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	usersWithConversations, err := getUsersWithConversations(userID)
 	if err != nil {
 		log.Println("Error getting conversation users:", err)
-	} else {
-		log.Printf("User %s has conversations with: %v\n", nickname, usersWithConversations)
 	}
 
 	// Get users who don't have conversations with this user
 	usersWithoutConversations, err := getUsersWithoutConversations(userID)
 	if err != nil {
 		log.Println("Error getting non-conversation users:", err)
-	} else {
-		log.Printf("User %s has no conversations with: %v\n", nickname, usersWithoutConversations)
 	}
 
 	client, err := createClient(conn, nickname)
@@ -157,15 +152,15 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	for {
 		var msg Message
 		if err := conn.ReadJSON(&msg); err != nil {
-			log.Println("Error reading message:", err)
 			mu.Lock()
 			delete(clients, conn)
 			broadcastOnlineUsers()
 			mu.Unlock()
 			break
 		}
-
-		saveMessage(msg.Sender, msg.Receiver, msg.Content)
+		if msg.Sender != "" && msg.Receiver != "" && msg.Content != "" {
+			saveMessage(msg.Sender, msg.Receiver, msg.Content)
+		}
 		if msg.Receiver != "" {
 			sendPrivateMessage(msg)
 		} else {
@@ -249,7 +244,7 @@ func GetNotifications(w http.ResponseWriter, r *http.Request) {
 		FROM notifications n
 		JOIN users u ON n.sender_id = u.id
 		WHERE n.user_id = (SELECT id FROM users WHERE nickname = ?)
-		AND n.is_read = FALSE  // Critical: Only unread!
+		AND n.is_read = FALSE
 		ORDER BY n.created_at DESC`,
 		nickname)
 	if err != nil {
@@ -413,27 +408,24 @@ func saveMessage(sender, receiver, content string) {
 }
 
 func broadcastOnlineUsers() {
-	userList := make([]map[string]string, 0, len(clients))
+	message := map[string]interface{}{
+		"type":  "onlineUsers",
+		"users": make([]map[string]string, 0, len(clients)),
+	}
+
 	for _, client := range clients {
-		userList = append(userList, map[string]string{
+		userData := map[string]string{
 			"nickname":  client.nickname,
 			"firstName": client.firstName,
 			"lastName":  client.lastName,
-		})
-	}
-
-	message := map[string]interface{}{
-		"type":  "onlineUsers",
-		"users": userList,
-	}
-
-	for _, client := range clients {
+		}
+		if client.conn == nil {
+			continue
+		}
+		message["users"] = append(message["users"].([]map[string]string), userData)
 		if err := client.conn.WriteJSON(message); err != nil {
-			log.Println("Error sending user list:", err)
 			client.conn.Close()
-			mu.Lock()
 			delete(clients, client.conn)
-			mu.Unlock()
 		}
 	}
 }
@@ -536,8 +528,6 @@ func FetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to fetch messages: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println(messages)
 
 	jsonResponse(w, messages)
 }
