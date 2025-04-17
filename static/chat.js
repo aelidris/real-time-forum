@@ -365,6 +365,7 @@ function setupScrollHandler(nickname) {
     }
 
 
+    
     window.sendPrivateMessage = (receiver) => {
         const messageInput = document.getElementById(`input-${receiver}`);
         const message = messageInput.value.trim();
@@ -523,11 +524,24 @@ function createUserElement(user) {
     document.getElementById("onlineUserList").appendChild(userElement);
 }
     
+
+function EscapeString(unsafeStr) {
+    return unsafeStr
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 const displayPrivateMessage = (data) => {
     if (!data || !data.sender || !data.receiver) {
         console.warn('Invalid message data received');
         return;
     }
+
+    data.content = EscapeString(data.content)
+
 
     const chatWith = data.sender === nickname ? data.receiver : data.sender;
     const messageList = document.getElementById(`messages-${chatWith}`);

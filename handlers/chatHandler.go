@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"forum/database"
+	"forum/utils"
 
 	"github.com/gorilla/websocket"
 )
@@ -158,6 +159,7 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			mu.Unlock()
 			break
 		}
+
 		if msg.Sender != "" && msg.Receiver != "" && msg.Content != "" {
 			saveMessage(msg.Sender, msg.Receiver, msg.Content)
 		}
@@ -394,6 +396,7 @@ func queryUsers(currentUser string) ([]User, error) {
 
 func saveMessage(sender, receiver, content string) {
 	var senderID, receiverID int
+	content = utils.EscapeString(content)
 	if err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", sender).Scan(&senderID); err != nil {
 		log.Println("Error getting sender ID:", err)
 		return
