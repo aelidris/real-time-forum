@@ -95,7 +95,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:    "session_token",
 		Value:   sessionToken,
-		Expires: time.Now().Add(1 * time.Hour),
+		Expires: time.Now().Add(24 * time.Hour),
 	})
 
 	response := map[string]string{
@@ -248,7 +248,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:    "session_token",
 		Value:   "guest",
-		Expires: time.Now().Add(1 * time.Hour),
+		Expires: time.Now().Add(-1 * time.Hour),
 	})
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 	fmt.Fprintln(w, "You have been logged out.")
