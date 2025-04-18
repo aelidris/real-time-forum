@@ -96,6 +96,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Name:    "session_token",
 		Value:   sessionToken,
 		Expires: time.Now().Add(24 * time.Hour),
+		Path:    "/",
 	})
 
 	response := map[string]string{
