@@ -1,40 +1,41 @@
 package handlers
 
 import (
-    "database/sql"
-    "fmt"
-    "log"
-    "net/http"
-    "time"
-    
-    "forum/database"
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
+	"time"
+
+	"forum/database"
 )
 
 var sessionStore = make(map[string]string)
+
 func RequireLogin(w http.ResponseWriter, r *http.Request) (string, string, bool, error) {
-	cookie, _ := r.Cookie("session_token")
-	if cookie == nil {
+	cookie, err := r.Cookie("session_token")
+	if err != nil || cookie == nil {
 		return "", "guest", false, nil
 	}
 
 	var nickname, sessionToken string
-	err := database.DB.QueryRow(
-		"SELECT nickname, session_token FROM users WHERE session_token = ?", 
+	err = database.DB.QueryRow(
+		"SELECT nickname, session_token FROM users WHERE session_token = ?",
 		cookie.Value,
 	).Scan(&nickname, &sessionToken)
-	
-	if err == sql.ErrNoRows {
-		for _, cookie := range r.Cookies() {
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Only clear the session token cookie
 			http.SetCookie(w, &http.Cookie{
-				Name:    cookie.Name,
+				Name:    "session_token",
 				Value:   "",
-				Expires: time.Now().Add(1 * time.Hour),
+				Expires: time.Now().Add(-1 * time.Hour), // Expire immediately
+				Path:    "/",
 			})
+			return "", "guest", false, nil
 		}
-		return "", "guest", false, err
-	} else if err != nil {
+
 		log.Printf("Database error: %v", err)
-		http.Error(w, "Internal server error.", http.StatusInternalServerError)
 		return "", "guest", false, err
 	}
 
@@ -44,15 +45,11 @@ func RequireLogin(w http.ResponseWriter, r *http.Request) (string, string, bool,
 func CheckSessionHandler(w http.ResponseWriter, r *http.Request) {
 	_, _, loggedIn, err := RequireLogin(w, r)
 	if err != nil {
-		fmt.Println("Error in RequiredLogin:", err)
+		log.Printf("Error in RequireLogin: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if loggedIn {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"loggedIn": true}`)
-	} else {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"loggedIn": false}`)
-	}
+	json.NewEncoder(w).Encode(map[string]bool{"loggedIn": loggedIn})
 }

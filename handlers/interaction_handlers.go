@@ -109,7 +109,6 @@ func handlePostLike(userID int, postIDStr string, isLike *bool) map[string]inter
 				"error": "Failed to submit interaction",
 			}
 		}
-		log.Println("Interaction added/updated successfully")
 
 		return map[string]interface{}{
 			"message":       "Interaction updated successfully",
