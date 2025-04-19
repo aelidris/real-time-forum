@@ -1,6 +1,49 @@
 function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     if (!nickname) return;
     
+    // Multi-window
+    const TAB_ID = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+     // Listen for storage events from other tabs
+     window.addEventListener('storage', (event) => {
+        if (event.key === 'chat_message_update' && event.newValue) {
+            const data = JSON.parse(event.newValue);
+            // Ignore messages from our own tab
+            if (data.tabId !== TAB_ID) {
+                if (data.type === 'new_message') {
+                    displayPrivateMessage(data.message);
+                    updateOnlineUsersList();
+                }
+            }
+        }
+        if (event.key === 'chat_notification_update' && event.newValue) {
+            const data = JSON.parse(event.newValue);
+            if (data.tabId !== TAB_ID) {  // Ignore messages from our own tab
+                // Update local state
+                unreadCounts[data.sender] = data.unreadCount;
+                userActivity[data.sender] = data.lastActivity;
+                
+                // Find the user element
+                const userElement = document.querySelector(`.online-user[data-nickname="${data.sender}"]`);
+                
+                if (userElement) {
+                    // Update badge
+                    const existingBadges = userElement.querySelectorAll(".unread-badge");
+                    existingBadges.forEach(badge => badge.remove());
+                    
+                    if (unreadCounts[data.sender] > 0) {
+                        const badge = document.createElement("span");
+                        badge.className = "unread-badge";
+                        badge.textContent = unreadCounts[data.sender];
+                        userElement.appendChild(badge);
+                    }
+                    
+                    // Trigger UI update
+                    updateOnlineUsersList();
+                }
+            }
+        }
+    });
+
     // Reset initialization state on each call
     window.chatSystemInitialized = false;
     
@@ -124,6 +167,13 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
               userActivity[data.sender] = Date.now();
               displayPrivateMessage(data);
               updateOnlineUsersList();
+              // Notify other tabs
+              localStorage.setItem('chat_message_update', JSON.stringify({
+                tabId: TAB_ID,
+                type: 'new_message',
+                message: data
+                }));
+                localStorage.removeItem('chat_message_update'); // Clear the event
             }
         }
       };
@@ -178,6 +228,15 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
             // Trigger full list update instead of manual reordering
             updateOnlineUsersList();
         }
+
+         // Notify other tabs about this notification
+        localStorage.setItem('chat_notification_update', JSON.stringify({
+            tabId: TAB_ID,  // Use the same TAB_ID from your initialization
+            sender: sender,
+            unreadCount: unreadCounts[sender],
+            lastActivity: userActivity[sender]
+        }));
+        localStorage.removeItem('chat_notification_update'); // Clear the event
     };
     
     let isLoading = false;
