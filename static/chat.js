@@ -233,7 +233,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     let allMessagesLoaded = false;
     let currentOffset = 0;
 
-    async function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
+    function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
         const limit = 10;
         const messageList = document.getElementById(`messages-${otherNickname}`);
         if (!messageList) return;
@@ -368,7 +368,7 @@ function setupScrollHandler(nickname) {
             chatBox.style.display = "block";
             currentOpenChat = nickname;
             
-            await fetchHistoricalMessages(nickname);
+            fetchHistoricalMessages(nickname);
             setupScrollHandler(nickname);
             resetUnreadCount(nickname);
     
