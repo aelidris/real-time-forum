@@ -207,7 +207,7 @@ a:hover {
   gap: clamp(1rem, 3vw, 1.5rem);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 650px) {
   .content-wrapper {
     grid-template-columns: 1fr;
   }
@@ -1021,7 +1021,7 @@ input[id^="input-"]:focus {
   }
   
   .online-users {
-    position: static;
+    position: sticky;
     width: 100%;
     margin-bottom: 20px;
   }
