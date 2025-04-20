@@ -1,4 +1,6 @@
-function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
+function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
+    console.log(nickname);
+    
     if (!nickname) return;
     
     // Multi-window
@@ -677,7 +679,7 @@ const displayPrivateMessage = (data) => {
     });
   }
 
-// this part for fiw when the page reloaded to save the list of users ... 
+// this part used when the page reloaded to save the list of users ... 
 document.addEventListener("DOMContentLoaded", () => {
     const nickname = localStorage.getItem("nickname");
     if (nickname) {
