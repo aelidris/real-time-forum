@@ -7,7 +7,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
      window.addEventListener('storage', (event) => {
         if (event.key === 'chat_message_update' && event.newValue) {
             const data = JSON.parse(event.newValue);  
-            // Ignore messages from our own tab
+            // Ignore messages from our own tab (case when we are in the same browser with different users loged and try to send a message from one to other)
             if (data.tabId !== TAB_ID) {
                 if (data.type === 'new_message') {
                     displayPrivateMessage(data.message);
@@ -17,7 +17,9 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
         }
         if (event.key === 'chat_notification_update' && event.newValue) {
             const data = JSON.parse(event.newValue);
-            if (data.tabId !== TAB_ID) {  // Ignore messages from our own tab
+            
+            if (data.tabId !== TAB_ID) { // Ignore messages from our own tab (case when we are in the same browser with different users loged and try to send a message from one to other)
+
                 // Update local state
                 unreadCounts[data.sender] = data.unreadCount;
                 userActivity[data.sender] = data.lastActivity;
