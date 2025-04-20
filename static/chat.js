@@ -175,18 +175,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     };
     }
 
-    function formatLastSeen(timestamp) {
-        if (!timestamp) return 'Never';
-        const now = new Date();
-        const lastSeen = new Date(timestamp);
-        const diffMinutes = Math.floor((now - lastSeen) / (1000 * 60));
-        
-        if (diffMinutes < 1) return 'Just now';
-        if (diffMinutes < 60) return `${diffMinutes} min ago`;
-        if (diffMinutes < 1440) return `${Math.floor(diffMinutes/60)} hours ago`;
-        return `${Math.floor(diffMinutes/1440)} days ago`;
-    }
-    
     const showNotification = (sender) => {
         // Update unread count
         unreadCounts[sender] = (unreadCounts[sender] || 0) + 1;
@@ -548,7 +536,6 @@ function createUserElement(user) {
     // Status indicator
     const statusDot = document.createElement('span');
     statusDot.className = `status-dot ${user.isOnline ? 'online' : 'offline'}`;
-    statusDot.title = user.isOnline ? 'Online' : `Last seen: ${formatLastSeen(user.lastSeen)}`;
 
     // Name display
     const nameContainer = document.createElement('div');
