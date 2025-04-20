@@ -679,5 +679,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// Make initializeChatSystem available globally for programmatic login
+// to export the function and can call it from any other script
 window.initializeChatSystem = initializeChatSystem;
