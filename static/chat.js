@@ -2,11 +2,11 @@ function initializeChatSystem(nickname = localStorage.getItem("nickname")) {
     if (!nickname) return;
     
     // Multi-window
-    const TAB_ID = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const TAB_ID = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
      // Listen for storage events from other tabs
      window.addEventListener('storage', (event) => {
         if (event.key === 'chat_message_update' && event.newValue) {
-            const data = JSON.parse(event.newValue);
+            const data = JSON.parse(event.newValue);  
             // Ignore messages from our own tab
             if (data.tabId !== TAB_ID) {
                 if (data.type === 'new_message') {
