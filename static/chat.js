@@ -1,6 +1,4 @@
-function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
-    console.log(nickname);
-    
+function initializeChatSystem(nickname = localStorag.getItem('nickname')) {    
     if (!nickname) return;
     
     // Multi-window
@@ -45,16 +43,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
             }
         }
     });
-
-    // Reset initialization state on each call
-    window.chatSystemInitialized = false;
-    
-    if (window.chatSystemInitialized) {
-        console.log("Chat system already initialized");
-        return;
-    }
-
-    window.chatSystemInitialized = true;
  
     let socket = null;
     let allUsers = [];
