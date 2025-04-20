@@ -101,9 +101,11 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
       fetch(`/get-notifications?nickname=${nickname}`)
       .then(response => response.json())
       .then(notifications => {
-          notifications.forEach(notif => {
-              console.log("Unread from:", notif.sender);
-          });
+        if (notifications !== null){
+            notifications.forEach(notif => {
+                console.log("Unread from:", notif.sender);
+            });
+        }
       });
 
       socket.onopen = () => {
