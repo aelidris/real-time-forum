@@ -250,8 +250,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
         fetch(`/fetch_messages?nickname=${encodeURIComponent(nickname)}&otherUser=${encodeURIComponent(otherNickname)}&offset=${offset}&limit=${limit}`)
         .then(response => response.json())
         .then(data => {     
-            console.log(data);
-
+            
             if ((Array.isArray(data) && data.length === 0)) {
                 allMessagesLoaded = true;
                 return;
