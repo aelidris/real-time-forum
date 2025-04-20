@@ -736,6 +736,8 @@ button:disabled {
   height: fit-content;
   position: sticky;
   top: 80px;
+  z-index: 1;
+
 }
 
 .online-users h3 {
@@ -1024,6 +1026,8 @@ input[id^="input-"]:focus {
     position: sticky;
     width: 100%;
     margin-bottom: 20px;
+    z-index: 1;
+
   }
   
   #onlineUserList {
