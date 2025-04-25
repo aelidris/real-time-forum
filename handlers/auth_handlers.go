@@ -21,6 +21,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
+		if r.URL.Path == "/login" {
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
 		response := map[string]string{"error": "Method not allowed"}
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(response)
@@ -111,6 +115,10 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	response := make(map[string]string)
 
 	if r.Method != http.MethodPost {
+		if r.URL.Path == "/register" {
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
 		response = map[string]string{"error": "Method not allowed"}
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(response)
