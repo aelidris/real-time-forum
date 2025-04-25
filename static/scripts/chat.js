@@ -101,6 +101,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     
     socket.onclose = (event) => {
         console.log("Disconnected from WebSocket server", event.reason);
+        localStorage.removeItem('nickname')
         if (event.reason === "User logged out") {
             document.querySelectorAll('.status-dot').forEach(dot => {
               dot.classList.remove('online');
@@ -146,7 +147,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
                 type: 'new_message',
                 message: data
                 }));
-                localStorage.removeItem('chat_message_update'); // Clear the event
+                localStorage.removeItem('chat_message_update');
             }
         }
       };
