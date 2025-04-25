@@ -2,7 +2,6 @@ document.getElementById("postForm").addEventListener("submit", function (event) 
   event.preventDefault();
   const errorElement = document.getElementById("postError") || document.createElement("div");
   
-  // Clear previous errors
   errorElement.textContent = "";
   errorElement.style.display = "none";
 
@@ -102,7 +101,7 @@ function createPostElement(postData) {
 
   postDiv.innerHTML = `
     <div class="post-header">
-      <img src="/static/profile.png" width="36" height="36" class="post-avatar" alt="user avatar">
+      <img src="/static/images/profile.png" width="36" height="36" class="post-avatar" alt="user avatar">
       <div class="author-time-container">
         <span class="author">${postData.Author}</span>
         <span class="post-time">${timeAgo}</span>
@@ -142,7 +141,7 @@ function createPostElement(postData) {
       ${commentCount > 0 ? postData.Comments.map(comment => `
         <div class="comment">
           <div class="comment-header">
-            <img src="/static/profile.png" width="32" height="32" class="comment-avatar">
+            <img src="/static/images/profile.png" width="32" height="32" class="comment-avatar">
             <div class="author-time-container">
               <span class="comment-author">${comment.Author}</span>
               <span class="comment-time">${formatTimeAgo(new Date(comment.CreatedAt))}</span>

@@ -4,15 +4,11 @@ async function populateCategoryFilter() {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-  
       const categories = await response.json();
-  
       const categoryFilter = document.getElementById('categoryFilter');
-  
       while (categoryFilter.options.length > 1) {
         categoryFilter.remove(1);
       }
-  
       categories.forEach((category) => {
         const option = document.createElement('option');
         option.value = category; 
@@ -31,14 +27,10 @@ async function populateCategoryFilter() {
       const response = await fetch('/get_categories');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const categories = await response.json();
-      // console.log(categories);
-      
+      } 
+      const categories = await response.json();  
       const categoryPostSubmit = document.getElementsByClassName('category-checkboxes')[0];
       categoryPostSubmit.innerHTML = '';  
-  
       categories.forEach((category) => {
         const option = document.createElement('input');
         option.type = 'checkbox';

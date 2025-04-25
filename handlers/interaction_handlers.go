@@ -65,7 +65,7 @@ func handlePostLike(userID int, postIDStr string, isLike *bool) map[string]inter
 			"error": "Invalid post ID",
 		}
 	}
-	// Check if the post id exists in the comments table
+
 	var exists bool
 	err = database.DB.QueryRow("SELECT EXISTS (SELECT 1 FROM posts WHERE id = ?)", postID).Scan(&exists)
 	if err != nil {
@@ -125,7 +125,6 @@ func handleCommentLike(userID int, commentIDStr string, isLike *bool) map[string
 			"error": "Invalid comment ID",
 		}
 	}
-	// Check if the comment_id exists in the comments table
 	var exists bool
 	err = database.DB.QueryRow("SELECT EXISTS (SELECT 1 FROM comments WHERE id = ?)", commentID).Scan(&exists)
 	if err != nil {

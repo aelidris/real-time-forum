@@ -18,7 +18,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// Unchanged HomePage handler
 func HomePage(w http.ResponseWriter, r *http.Request) {
 	response := make(map[string]interface{})
 
@@ -57,7 +56,6 @@ func HomePage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Updated ShowPosts handler
 func ShowPosts(w http.ResponseWriter, r *http.Request) {
 	response := make(map[string]interface{})
 
@@ -220,9 +218,8 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Updated PostSubmit handler
 func PostSubmit(w http.ResponseWriter, r *http.Request) {
-	nickname, sessionToken, loggedIn, _ := RequireLogin(w, r) // Changed variable name
+	nickname, sessionToken, loggedIn, _ := RequireLogin(w, r) 
 	response := make(map[string]interface{})
 
 	if !loggedIn {
@@ -269,7 +266,6 @@ func PostSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var exists bool
-	// Changed from username to nickname
 	err := database.DB.QueryRow("SELECT EXISTS (SELECT 1 FROM users WHERE nickname = ?)", nickname).Scan(&exists)
 	if err != nil {
 		log.Printf("Error checking user existence: %v", err)

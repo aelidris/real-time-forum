@@ -1,13 +1,10 @@
 function initializeChatSystem(nickname = localStorag.getItem('nickname')) {    
     if (!nickname) return;
     
-    // Multi-window
     const TAB_ID = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-     // Listen for storage events from other tabs
      window.addEventListener('storage', (event) => {
         if (event.key === 'chat_message_update' && event.newValue) {
             const data = JSON.parse(event.newValue);  
-            // Ignore messages from our own tab (case when we are in the same browser with different users loged and try to send a message from one to other)
             if (data.tabId !== TAB_ID) {
                 if (data.type === 'new_message') {
                     displayPrivateMessage(data.message);
@@ -18,17 +15,11 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
         if (event.key === 'chat_notification_update' && event.newValue) {
             const data = JSON.parse(event.newValue);
             
-            if (data.tabId !== TAB_ID) { // Ignore messages from our own tab (case when we are in the same browser with different users loged and try to send a message from one to other)
-
-                // Update local state
+            if (data.tabId !== TAB_ID) { 
                 unreadCounts[data.sender] = data.unreadCount;
                 userActivity[data.sender] = data.lastActivity;
-                
-                // Find the user element
-                const userElement = document.querySelector(`.online-user[data-nickname="${data.sender}"]`);
-                
+                const userElement = document.querySelector(`.online-user[data-nickname="${data.sender}"]`);   
                 if (userElement) {
-                    // Update badge
                     const existingBadges = userElement.querySelectorAll(".unread-badge");
                     existingBadges.forEach(badge => badge.remove());
                     
@@ -38,8 +29,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
                         badge.textContent = unreadCounts[data.sender];
                         userElement.appendChild(badge);
                     }
-                    
-                    // Trigger UI update
                     updateOnlineUsersList();
                 }
             }
@@ -53,16 +42,13 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     const unreadCounts = {};
     let currentOpenChat = null;
 
-    // Show loading state
     const userList = document.getElementById("onlineUserList");
     if (userList) {
         userList.innerHTML = '<li class="loading">Loading users...</li>';
     }
     
-    // First fetch all users
     fetchAllUsers(nickname)
       .then(() => {
-        // Then establish WebSocket connection
         initializeWebSocket(nickname);
       })
       .catch(error => {
@@ -73,7 +59,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
         }
       });
     
-    // Define all the helper functions that were in your DOMContentLoaded
     function fetchAllUsers(nickname) {
       return new Promise((resolve, reject) => {
         fetch(`/get_all_users?nickname=${encodeURIComponent(nickname)}`)
@@ -97,7 +82,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     function initializeWebSocket(nickname) {
       socket = new WebSocket(`ws://localhost:4422/ws?nickname=${nickname}`);
 
-      // Fetch notifications when page loads
       fetch(`/get-notifications?nickname=${nickname}`)
       .then(response => response.json())
       .then(notifications => {
@@ -110,7 +94,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
 
       socket.onopen = () => {
         console.log("Connected to WebSocket server");
-        // Request online users explicitly after connection
         socket.send(JSON.stringify({
             type: "requestOnlineUsers"
         }));
@@ -118,9 +101,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     
     socket.onclose = (event) => {
         console.log("Disconnected from WebSocket server", event.reason);
-        
         if (event.reason === "User logged out") {
-            // Visual feedback for offline status
             document.querySelectorAll('.status-dot').forEach(dot => {
               dot.classList.remove('online');
               dot.classList.add('offline');
@@ -132,7 +113,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         switch (data.type) {
-            case "userRegistered":
+          case "userRegistered":
             const newUser = data.user;
             if (!allUsers.some(u => u.nickname === newUser.nickname)) {
                 allUsers.push({
@@ -157,11 +138,9 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
             break;
           default:
             if (data.receiver) {
-              // Only update lastActivity for actual messages
               userActivity[data.sender] = Date.now();
               displayPrivateMessage(data);
               updateOnlineUsersList();
-              // Notify other tabs
               localStorage.setItem('chat_message_update', JSON.stringify({
                 tabId: TAB_ID,
                 type: 'new_message',
@@ -178,54 +157,41 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     }
 
     const showNotification = (sender) => {
-        // Update unread count
-        unreadCounts[sender] = (unreadCounts[sender] || 0) + 1;
-        
-        // Update last activity time
+        unreadCounts[sender] = (unreadCounts[sender] || 0) + 1;  
         userActivity[sender] = Date.now();
-        
-        // Find the user element
         const userElement = document.querySelector(`.online-user[data-nickname="${sender}"]`);
-        
         if (userElement) {
-            // Highlight the user
             userElement.style.backgroundColor = "#f1a564";
             userElement.style.transition = "background-color 0.3s ease";
-            
-            // Update badge
             const existingBadges = userElement.querySelectorAll(".unread-badge");
-            existingBadges.forEach(badge => badge.remove());
-            
+            existingBadges.forEach(badge => badge.remove()); 
             if (unreadCounts[sender] > 0) {
                 const badge = document.createElement("span");
                 badge.className = "unread-badge";
                 badge.textContent = unreadCounts[sender];
                 userElement.appendChild(badge);
             }
-            
             setTimeout(() => {
                 userElement.style.backgroundColor = "";
             }, 3000);
             
-            // Trigger full list update instead of manual reordering
             updateOnlineUsersList();
         }
 
-         // Notify other tabs about this notification
         localStorage.setItem('chat_notification_update', JSON.stringify({
-            tabId: TAB_ID,  // Use the same TAB_ID from your initialization
+            tabId: TAB_ID, 
             sender: sender,
             unreadCount: unreadCounts[sender],
             lastActivity: userActivity[sender]
         }));
-        localStorage.removeItem('chat_notification_update'); // Clear the event
+        localStorage.removeItem('chat_notification_update'); 
     };
     
     let isLoading = false;
     let allMessagesLoaded = false;
     let currentOffset = 0;
 
-    function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
+    async function fetchHistoricalMessages(otherNickname, offset = 0, append = false) {
         const limit = 10;
         const messageList = document.getElementById(`messages-${otherNickname}`);
         if (!messageList) return;
@@ -242,26 +208,19 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
             loadingIndicator.textContent = 'Loading more messages...';
             messageList.insertBefore(loadingIndicator, messageList.firstChild);
         }
-
         if (isLoading || allMessagesLoaded ) return;
 
         isLoading = true;
-
         fetch(`/fetch_messages?nickname=${encodeURIComponent(nickname)}&otherUser=${encodeURIComponent(otherNickname)}&offset=${offset}&limit=${limit}`)
         .then(response => response.json())
-        .then(data => {     
-            
+        .then(data => {                
             if ((Array.isArray(data) && data.length === 0)) {
                 allMessagesLoaded = true;
                 return;
             }
-
             const messages = Array.isArray(data) ? data : [];
-
             displayMessages(messages, messageList, append);
-
             currentOffset += messages.length;
-
             if (messages.length < limit) {
                 allMessagesLoaded = true;
             }
@@ -275,14 +234,9 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     }
 
 function displayMessages(messages, messageList, append) {
-    // Remove loading indicator
     const loadingIndicator = messageList.querySelector('.loading-message');
     if (loadingIndicator) messageList.removeChild(loadingIndicator);
-
-    // Sort messages chronologically
     messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-    // Create message elements
     const messageElements = messages.map(msg => {
         const msgElement = document.createElement('li');
         msgElement.className = msg.sender === nickname ? 'sent-message' : 'received-message';
@@ -292,19 +246,13 @@ function displayMessages(messages, messageList, append) {
     });
 
     if (append) {
-        // Save scroll state before adding messages
         const scrollPos = messageList.scrollTop;
-        const scrollHeight = messageList.scrollHeight;
-        
-        // Add messages to top in reverse order (oldest first)
+        const scrollHeight = messageList.scrollHeight;     
         messageElements.reverse().forEach(msg => {
             messageList.insertBefore(msg, messageList.firstChild);
-        });
-        
-        // Restore scroll position relative to new content
+        });       
         messageList.scrollTop = scrollPos + (messageList.scrollHeight - scrollHeight);
     } else {
-        // Initial load - add to bottom (newest first)
         messageList.innerHTML = '';
         messageElements.forEach(msg => {
             messageList.appendChild(msg);
@@ -315,29 +263,22 @@ function displayMessages(messages, messageList, append) {
 
 function setupScrollHandler(nickname) {
     const messageList = document.getElementById(`messages-${nickname}`);
-    if (!messageList) return;
-    
-    let scrollDebounceTimer = null;
-    
+    if (!messageList) return;  
+    let scrollDebounceTimer = null;   
     messageList.addEventListener('scroll', () => {
-        // Clear any pending debounce
         if (scrollDebounceTimer) {
             clearTimeout(scrollDebounceTimer);
         }
-        
-        // Set new debounce
-        scrollDebounceTimer = setTimeout(() => {
-            // Check if we're near top and should load more
+        scrollDebounceTimer = setTimeout(async () => {
             if (messageList.scrollTop < 50 && !isLoading && !allMessagesLoaded) {
-                fetchHistoricalMessages(nickname, currentOffset, true);
+                await fetchHistoricalMessages(nickname, currentOffset, true);
             }
-        }, 250);
+        }, 500);
     });
 }
     
     
     window.openPrivateChat = async (nickname, firstName, lastName) => {
-
         const recieverOfNoti = localStorage.getItem("nickname") 
         try {
             await fetch('/mark-read', {
@@ -359,7 +300,7 @@ function setupScrollHandler(nickname) {
             chatBox.style.display = "block";
             currentOpenChat = nickname;
             
-            fetchHistoricalMessages(nickname);
+            await fetchHistoricalMessages(nickname);
             setupScrollHandler(nickname);
             resetUnreadCount(nickname);
     
@@ -402,10 +343,8 @@ function setupScrollHandler(nickname) {
         if (event.key === 'Enter') {
             sendPrivateMessage(nickname);
         }
-    }
+    }    
 
-
-    
     window.sendPrivateMessage = (receiver) => {
         const messageInput = document.getElementById(`input-${receiver}`);
         const message = messageInput.value.trim();
@@ -418,19 +357,16 @@ function setupScrollHandler(nickname) {
                 timestamp: new Date().toLocaleTimeString(),
             };
             
-            socket.send(JSON.stringify(data));
-            
-            messageInput.value = "";
-            
+            socket.send(JSON.stringify(data)); 
+            messageInput.value = ""; 
             displayPrivateMessage({ 
                 ...data, 
                 firstName: "You", 
                 lastName: "" 
             });
             
-            // Update activity and UI
             userActivity[receiver] = Date.now();
-            updateOnlineUsersList(); // This will move the user to "Active Conversations" if needed
+            updateOnlineUsersList(); 
             resetUnreadCount(receiver);
         } else if (!message) {
             console.log("Empty message, not sending");
@@ -441,7 +377,6 @@ function setupScrollHandler(nickname) {
     };
     
     const updateOnlineUsersList = () => {
-    // Combine online status with all users data
     const combinedUsers = allUsers.map(user => {
         const isOnline = onlineUsers.some(u => u.nickname === user.nickname);
         const lastActivity = userActivity[user.nickname] || 0;
@@ -454,7 +389,6 @@ function setupScrollHandler(nickname) {
         };
     });
 
-    // Check if we have any online users not in allUsers (newly registered)
     onlineUsers.forEach(onlineUser => {
       if (!allUsers.some(user => user.nickname === onlineUser.nickname)) {
         combinedUsers.push({
@@ -474,40 +408,28 @@ function setupScrollHandler(nickname) {
 const updateOnlineUsers = (users) => {
     const userList = document.getElementById("onlineUserList");
     if (!userList) return;
-
     const convData = window.conversationData || { with_conversations: [] };
     const withConvs = new Set(convData.with_conversations || []);
-
-    // Split users into groups
     const withConvUsers = users.filter(user => 
         user.nickname !== nickname && withConvs.has(user.nickname)
     );
     const withoutConvUsers = users.filter(user => 
         user.nickname !== nickname && !withConvs.has(user.nickname)
     );
-
-    // Sort active conversations by last message time (not connection time)
     const sortedWithConv = withConvUsers.sort((a, b) => 
         (b.lastActivity || 0) - (a.lastActivity || 0)
     );
-
-    // Sort other users by last activity (if any) then alphabetically
     const sortedWithoutConv = withoutConvUsers.sort((a, b) => {
-        // If both have activity, sort by most recent
         if (a.lastActivity && b.lastActivity) {
             return b.lastActivity - a.lastActivity;
         }
-        // If only one has activity, put that first
         if (a.lastActivity) return -1;
         if (b.lastActivity) return 1;
-        // Otherwise sort alphabetically
         return a.firstName.localeCompare(b.firstName, undefined, { sensitivity: 'base' });
     });
 
-    // Clear and rebuild list
     userList.innerHTML = '';
 
-    // Add active conversations
     if (sortedWithConv.length > 0) {
         const header = document.createElement('li');
         header.className = 'section-header';
@@ -517,7 +439,6 @@ const updateOnlineUsers = (users) => {
         sortedWithConv.forEach(user => createUserElement(user));
     }
 
-    // Add other users
     if (sortedWithoutConv.length > 0) {
         const header = document.createElement('li');
         header.className = 'section-header';
@@ -528,17 +449,12 @@ const updateOnlineUsers = (users) => {
     }
 };
 
-// Helper function to create consistent user list items
 function createUserElement(user) {
     const userElement = document.createElement('li');
     userElement.className = 'online-user';
     userElement.dataset.nickname = user.nickname;
-
-    // Status indicator
     const statusDot = document.createElement('span');
     statusDot.className = `status-dot ${user.isOnline ? 'online' : 'offline'}`;
-
-    // Name display
     const nameContainer = document.createElement('div');
     nameContainer.className = 'user-name-container';
     nameContainer.innerHTML = `
@@ -546,7 +462,6 @@ function createUserElement(user) {
         <span class="user-last-name">${user.lastName}</span>
     `;
 
-    // Unread badge
     if (user.unread > 0) {
         const badge = document.createElement('span');
         badge.className = 'unread-badge';
@@ -562,7 +477,6 @@ function createUserElement(user) {
 
     document.getElementById("onlineUserList").appendChild(userElement);
 }
-    
 
 function EscapeString(unsafeStr) {
     return unsafeStr
@@ -578,19 +492,14 @@ const displayPrivateMessage = (data) => {
         console.warn('Invalid message data received');
         return;
     }
-
     data.content = EscapeString(data.content)
-
-
     const chatWith = data.sender === nickname ? data.receiver : data.sender;
     const messageList = document.getElementById(`messages-${chatWith}`);
     
-    // Update the last activity time for this user
     if (chatWith) {
         userActivity[chatWith] = Date.now();
     }
 
-    // Add the message to the chat if it exists
     if (messageList) {
         const displayName = data.sender === nickname 
             ? "You" 
@@ -603,18 +512,13 @@ const displayPrivateMessage = (data) => {
         messageList.scrollTop = messageList.scrollHeight;
     }
 
-    // Initialize conversation data if it doesn't exist
-    window.conversationData = window.conversationData || { with_conversations: [] };
-    
-    // Safely access the conversations array
+    window.conversationData = window.conversationData || { with_conversations: [] };    
     const conversations = window.conversationData.with_conversations || [];
     
-    // Add user to conversations if not already there
     if (chatWith && !conversations.includes(chatWith)) {
         conversations.push(chatWith);
         window.conversationData.with_conversations = conversations;
         
-        // Notify server about the new conversation
         if (socket?.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 type: "update_conversations",
@@ -623,18 +527,17 @@ const displayPrivateMessage = (data) => {
         }
     }
 
-    // Always update the UI to reflect recent activity
     updateOnlineUsersList();
 };
     
     window.closeChat = (nickname) => {
         const chatBox = document.getElementById(`chat-${nickname}`);
         if (chatBox) chatBox.style.display = "none";
-        currentOpenChat = null; // Reset the tracker
+        currentOpenChat = null; 
     };
     
     const resetUnreadCount = (nickname) => {
-        unreadCounts[nickname] = 0; // Set to 0 instead of deleting to maintain the key
+        unreadCounts[nickname] = 0; 
         const userElement = document.querySelector(`.online-user[data-nickname="${nickname}"]`);
         if (userElement) {
             const badge = userElement.querySelector(".unread-badge");
@@ -642,7 +545,6 @@ const displayPrivateMessage = (data) => {
         }
     };
     
-    // Poll for user status updates every 30 seconds
     const userStatusInterval = setInterval(() => {
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
@@ -651,23 +553,18 @@ const displayPrivateMessage = (data) => {
         }
     }, 30000);
     
-    // Clean up interval on page unload
     window.addEventListener('beforeunload', () => {
         clearInterval(userStatusInterval);
     });
   }
 
-// this part used when the page reloaded to save the list of users ... 
 document.addEventListener("DOMContentLoaded", () => {
     const nickname = localStorage.getItem("nickname");
     if (nickname) {
-        initializeChatSystem(nickname);
-        
-        // Show chat interface and hide login
+        initializeChatSystem(nickname);       
         document.getElementById("loginContainer").style.display = "none";
         document.getElementById("chatContainer").style.display = "block";
     }
 });
 
-// to export the function and can call it from any other script
 window.initializeChatSystem = initializeChatSystem;

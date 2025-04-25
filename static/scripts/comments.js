@@ -1,11 +1,9 @@
-// Function to toggle the visibility of comments section
 function toggleComments(postID) {
   const commentsSection = document.getElementById(`comments-${postID}`);
   commentsSection.style.display =
     commentsSection.style.display === "none" ? "block" : "none";
 }
 
-// Function to submit a comment
 async function submitComment(event, postID) {
   event.preventDefault();
 
@@ -26,14 +24,12 @@ async function submitComment(event, postID) {
     let curPost = document.getElementsByClassName(`post${postID}`)[0];
     let comments = result[postID - 1].Comments;
 
-    // Update comment count with icon
     const commentButton = curPost.getElementsByClassName("comment-button")[0];
     commentButton.innerHTML = `
       <ion-icon name="chatbubble-outline"></ion-icon>
       <span>Comments (${comments.length})</span>
     `;
 
-    // Update comments section
     curPost.getElementsByClassName("comments-section")[0].innerHTML = `
       <div class="comments-section" id="comments-${postID}">
         <form class="comment-form" id="commentForm-${postID}" onsubmit="submitComment(event, ${postID})">
@@ -47,7 +43,7 @@ async function submitComment(event, postID) {
         ${comments.length > 0 ? comments.map((comment) => `
           <div class="comment">
             <div class="comment-header">
-              <img src="/static/profile.png" width="32" height="32" class="comment-avatar">
+              <img src="/static/images/profile.png" width="32" height="32" class="comment-avatar">
               <div class="comment-author-time">
                 <span class="comment-author">${comment.Author}</span>
                 <span class="comment-time">${formatTimeAgo(new Date(comment.CreatedAt))}</span>

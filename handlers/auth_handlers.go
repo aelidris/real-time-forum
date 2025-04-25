@@ -225,7 +225,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add the user to the chat with a welcome message to chats
 	_, err = database.DB.Exec(`
         INSERT INTO chats (sender_id, receiver_id, message, sent_at, meta_data)
         VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)`,

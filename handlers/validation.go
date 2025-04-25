@@ -24,7 +24,6 @@ func ValidateInput(nickname, email, password, firstName, lastName string, age in
 	const maxFirstName = 50
 	const maxLastName = 50
 
-	// Nickname validation
 	if len(nickname) == 0 {
 		errors["nickname"] = "Nickname cannot be empty"
 	} else if len(nickname) > maxNickname {
@@ -33,9 +32,6 @@ func ValidateInput(nickname, email, password, firstName, lastName string, age in
 		errors["nickname"] = "Nickname should combined with just letters (a-z) (A-Z)"
 	}
 
-	
-
-	// Email validation
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if len(email) == 0 {
 		errors["email"] = "Email cannot be empty"
@@ -45,7 +41,6 @@ func ValidateInput(nickname, email, password, firstName, lastName string, age in
 		errors["email"] = "Invalid email format"
 	}
 
-	// Password validation
 	if len(password) < 8 {
 		errors["password"] = "Password must be at least 8 characters long"
 	} else if len(password) > maxPassword {
@@ -70,7 +65,6 @@ func ValidateInput(nickname, email, password, firstName, lastName string, age in
 		}
 	}
 
-	// Name validation
 	if len(firstName) == 0 {
 		errors["first_name"] = "First name cannot be empty"
 	} else if len(firstName) > maxFirstName {
@@ -83,12 +77,10 @@ func ValidateInput(nickname, email, password, firstName, lastName string, age in
 		errors["last_name"] = fmt.Sprintf("Last name cannot be longer than %d characters", maxLastName)
 	}
 
-	// Age validation
 	if age < 0 || age > 150 {
 		errors["age"] = "Age must be between 0 and 150"
 	}
 
-	// Gender validation
 	if gender != "Male" && gender != "Female" {
 		errors["gender"] = "Gender must be either 'Male' or 'Female'"
 	}

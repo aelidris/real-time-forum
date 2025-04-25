@@ -25,11 +25,10 @@ func RequireLogin(w http.ResponseWriter, r *http.Request) (string, string, bool,
 	).Scan(&nickname, &sessionToken)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			// Only clear the session token cookie
 			http.SetCookie(w, &http.Cookie{
 				Name:    "session_token",
 				Value:   "",
-				Expires: time.Now().Add(-1 * time.Hour), // Expire immediately
+				Expires: time.Now().Add(-1 * time.Hour), 
 				Path:    "/",
 			})
 			return "", "guest", false, nil

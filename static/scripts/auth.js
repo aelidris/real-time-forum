@@ -21,18 +21,11 @@ document.getElementById("loginForm").addEventListener("submit", function (event)
     .then(data => {
       if (data.message) {
         this.reset();
-        // Store nickname immediately
         localStorage.setItem("nickname", data.nickname);
-        console.log("Login successful, nickname:", data.nickname);
-        
-        // Hide login form and show chat interface
+        console.log("Login successful, nickname:", data.nickname);        
         document.getElementById("loginContainer").style.display = "none";
-        document.getElementById("chatContainer").style.display = "block";
-        
-        // Initialize chat system programmatically
-        initializeChatSystem(data.nickname);
-        
-        // Call any other success handlers
+        document.getElementById("chatContainer").style.display = "block";        
+        initializeChatSystem(data.nickname);        
         if (window.handleAuthSuccess) {
           window.handleAuthSuccess();
         }
@@ -46,22 +39,15 @@ document.getElementById("loginForm").addEventListener("submit", function (event)
 document.getElementById("registerForm").addEventListener("submit", function (event) {
   event.preventDefault();
   clearErrors();
-
   const formData = new FormData(this);
   const password = formData.get("password");
   const confirmPassword = document.getElementById("confirmPassword").value;
   const passwordError = document.getElementById("passwordError");
-
-  // Client-side validation
   let isValid = true;
-
-  // Password match check
   if (password !== confirmPassword) {
     showError(passwordError, "Passwords do not match!");
     isValid = false;
   }
-
-  // Required fields check
   const requiredFields = [
     'nickname', 'email', 'first_name', 'last_name', 
     'age', 'gender', 'password'
@@ -100,9 +86,7 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
     .then(data => {
       if (data.message) {
         this.reset();
-        document.getElementById("confirmPassword").value = "";
-        
-        // Automatically log in with the new credentials
+        document.getElementById("confirmPassword").value = "";        
         return fetch("/login", {
           method: "POST",
           body: new URLSearchParams({
@@ -114,18 +98,11 @@ document.getElementById("registerForm").addEventListener("submit", function (eve
     })
     .then(loginData => {
       if (loginData && loginData.message) {
-        // Store nickname immediately
         localStorage.setItem("nickname", loginData.nickname);
         console.log("Login successful, nickname:", loginData.nickname);
-        
-        // Hide login form and show chat interface
         document.getElementById("loginContainer").style.display = "none";
-        document.getElementById("chatContainer").style.display = "block";
-        
-        // Initialize chat system programmatically
+        document.getElementById("chatContainer").style.display = "block"; 
         initializeChatSystem(loginData.nickname);
-        
-        // Call any other success handlers
         if (window.handleAuthSuccess) {
           window.handleAuthSuccess();
         }

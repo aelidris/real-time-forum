@@ -10,14 +10,13 @@
     rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Forum</title>
-  <link rel="icon" type="image/x-icon" href="/static/forum_icon.png">
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" type="image/x-icon" href="/static/images/forum_icon.png">
+  <link rel="stylesheet" href="/static/css/style.css" />
   <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
   <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
 </head>
 
 <body>
-  <!-- Auth Container (Visible by default) -->
   <div class="auth-main-container" id="authContainer">
     <div class="auth-wrapper">
       <div class="auth-header">
@@ -36,7 +35,6 @@
         </button>
       </div>
 
-      <!-- Login Form -->
       <form id="loginForm" class="auth-form active">
         <div class="form-group">
           <label for="loginIdentifier">Nickname or Email</label>
@@ -58,7 +56,6 @@
       </form>
       <div id="loginMessage" class="auth-message"></div>
 
-      <!-- Registration Form -->
       <form id="registerForm" class="auth-form">
         <div class="form-group">
           <label for="registerNickname">Nickname</label>
@@ -125,9 +122,7 @@
     </div>
   </div>
 
-<!-- Main Content (Hidden initially) -->
 <div class="main-content" id="mainContent">
-  <!-- Header (Outside the main-content container) -->
   <header class="header">
     <div class="header-content">
       <a href="#" class="logo">FORUM</a>
@@ -144,19 +139,14 @@
     </div>
   </header>
 
-  <!-- Main Layout (Contacts and Posts) -->
   <div class="content-wrapper">
-    <!-- Contacts (Online Users) -->
     <aside class="online-users">
       <h3>Contacts</h3>
       <ul id="onlineUserList">
-        <!-- Users will be inserted dynamically here -->
       </ul>
     </aside>
 
-    <!-- Posts Container -->
     <main class="container">
-      <!-- Create Post Popup -->
       <div class="post-popup" id="postPopup">
         <div class="post-container">
           <button class="close-popup" id="closePostPopup">&times;</button>
@@ -182,9 +172,7 @@
         </div>
       </div>
 
-      <!-- Posts and Filter Container -->
       <div id="postsAndFilterContainer">
-        <!-- Category Filter -->
         <div class="filter-container">
           <label for="categoryFilter">Filter by Category:</label>
           <select id="categoryFilter">
@@ -192,7 +180,6 @@
           </select>
         </div>
 
-        <!-- Posts Container -->
         <div id="allPosts"></div>
         <button id="loadMoreBtn" style="display: none">
           <ion-icon name="arrow-down-circle-outline"></ion-icon>
@@ -211,18 +198,18 @@
     </main>
   </div>
 
-  <!-- Private Chat Boxes (Dynamically Added) -->
   <div id="chatContainer" style="display: none;"></div>
+
 </div>
 
-  <!-- Scripts -->
-  <script src="/static/chat.js"></script>
-  <script src="/static/guest.js"></script>
-  <script src="/static/auth.js"></script>
-  <script src="/static/comments.js"></script>
-  <script src="/static/interactions.js"></script>
-  <script src="/static/posts.js"></script>
-  <script src="/static/categories.js"></script>
+  <script src="/static/scripts/chat.js"></script>
+  <script src="/static/scripts/guest.js"></script>
+  <script src="/static/scripts/auth.js"></script>
+  <script src="/static/scripts/comments.js"></script>
+  <script src="/static/scripts/interactions.js"></script>
+  <script src="/static/scripts/posts.js"></script>
+  <script src="/static/scripts/categories.js"></script>
+
   <script>
     function togglePassword(fieldId) {
       const passwordField = document.getElementById(fieldId);
@@ -238,6 +225,7 @@
       }
     }
   </script>
+
 </body>
 
 </html>

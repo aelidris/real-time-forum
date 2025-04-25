@@ -45,12 +45,9 @@ var (
 	mu       sync.Mutex
 )
 
-// this method to safely access the connection
 func (c *Client) Conn() *websocket.Conn {
 	return c.conn
 }
-
-// this method to send JSON
 func (c *Client) SendJSON(v interface{}) error {
 	return c.conn.WriteJSON(v)
 }
@@ -95,20 +92,17 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get the user's ID based on nickname (you'll need to implement this)
 	userID, err := getUserIDByNickname(nickname)
 	if err != nil {
 		log.Println("Error getting user ID:", err)
 		return
 	}
 
-	// Fetch and send pending notifications on connection
 	notifications, err := fetchUnreadNotifications(nickname)
 	if err != nil {
 		log.Println("Error fetching notifications:", err)
 	} else {
 		for _, notif := range notifications {
-			// Send each notification
 			if err := conn.WriteJSON(notif); err != nil {
 				log.Printf("Failed to send pending notification to %s: %v", nickname, err)
 				continue
@@ -116,13 +110,11 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get users who have conversations with this user
 	usersWithConversations, err := getUsersWithConversations(userID)
 	if err != nil {
 		log.Println("Error getting conversation users:", err)
 	}
 
-	// Get users who don't have conversations with this user
 	usersWithoutConversations, err := getUsersWithoutConversations(userID)
 	if err != nil {
 		log.Println("Error getting non-conversation users:", err)
@@ -139,7 +131,6 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	broadcastOnlineUsers()
 	mu.Unlock()
 
-	// Send conversation data to the client
 	conn.WriteJSON(map[string]interface{}{
 		"type": "conversation_data",
 		"data": map[string]interface{}{
@@ -171,7 +162,6 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Get user ID from nickname
 func getUserIDByNickname(nickname string) (int, error) {
 	var id int
 	err := database.DB.QueryRow("SELECT id FROM users WHERE nickname = ?", nickname).Scan(&id)
@@ -206,7 +196,7 @@ func fetchUnreadNotifications(nickname string) ([]map[string]interface{}, error)
 		notifications = append(notifications, map[string]interface{}{
 			"type":   "notification",
 			"sender": sender,
-			"db_id":  id, // For marking as read later
+			"db_id":  id, 
 		})
 	}
 	return notifications, nil
@@ -223,7 +213,6 @@ func MarkNotificationsRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// DELETE instead of UPDATE
 	_, err := database.DB.Exec(`
         DELETE FROM notifications 
         WHERE user_id = (SELECT id FROM users WHERE nickname = ?)
@@ -239,8 +228,6 @@ func MarkNotificationsRead(w http.ResponseWriter, r *http.Request) {
 
 func GetNotifications(w http.ResponseWriter, r *http.Request) {
 	nickname := r.URL.Query().Get("nickname")
-
-	// ONLY return truly unread notifications
 	rows, err := database.DB.Query(`
 		SELECT n.id, u.nickname as sender
 		FROM notifications n
@@ -255,7 +242,7 @@ func GetNotifications(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	notifications, err := fetchUnreadNotifications(nickname) // Use your existing function
+	notifications, err := fetchUnreadNotifications(nickname) 
 	if err != nil {
 		http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
 		return
@@ -265,7 +252,6 @@ func GetNotifications(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(notifications)
 }
 
-// Get users who have conversations with the given user
 func getUsersWithConversations(userID int) ([]string, error) {
 	query := `
         SELECT DISTINCT u.nickname 
@@ -290,7 +276,6 @@ func getUsersWithConversations(userID int) ([]string, error) {
 	return nicknames, nil
 }
 
-// Get users who don't have conversations with the given user
 func getUsersWithoutConversations(userID int) ([]string, error) {
 	query := `
         SELECT u.nickname 
@@ -478,7 +463,6 @@ func sendNotification(receiver, sender string) {
 			}); err != nil {
 				log.Println("Error sending notification:", err)
 			} else {
-				// Mark as read if successfully delivered
 				database.DB.Exec(`
                     UPDATE notifications 
                     SET is_read = true 
@@ -517,21 +501,17 @@ func FetchMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing nickname or otherUser", http.StatusBadRequest)
 		return
 	}
-
-	// Set default values if not provided
 	if offset == "" {
 		offset = "0"
 	}
 	if limit == "" {
 		limit = "10"
 	}
-
 	messages, err := queryMessages(currentUser, otherUser, offset, limit)
 	if err != nil {
 		http.Error(w, "Failed to fetch messages: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	jsonResponse(w, messages)
 }
 

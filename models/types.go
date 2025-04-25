@@ -9,7 +9,7 @@ type Post struct {
 	Content    string
 	Categories []string
 	Comments   []CommentWithLike
-	CreatedAt  time.Time // Add this field
+	CreatedAt  time.Time 
 }
 
 type PostWithLike struct {
@@ -23,7 +23,7 @@ type Comment struct {
 	CommentID int
 	Content   string
 	CreatedAt time.Time
-	Author    string // Add this field
+	Author    string 
 }
 
 type CommentWithLike struct {
