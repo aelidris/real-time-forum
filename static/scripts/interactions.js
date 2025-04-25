@@ -71,7 +71,6 @@ async function submitLikeDislike({ postID = null, commentID = null, isLike }) {
     }
   } catch (error) {
     console.error("Error submitting like/dislike:", error);
-    alert("Something went wrong. Please try again.");
   } finally {
     likeBtn.disabled = false;
     dislikeBtn.disabled = false;
