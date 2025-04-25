@@ -48,6 +48,7 @@ var (
 func (c *Client) Conn() *websocket.Conn {
 	return c.conn
 }
+
 func (c *Client) SendJSON(v interface{}) error {
 	return c.conn.WriteJSON(v)
 }
@@ -196,7 +197,7 @@ func fetchUnreadNotifications(nickname string) ([]map[string]interface{}, error)
 		notifications = append(notifications, map[string]interface{}{
 			"type":   "notification",
 			"sender": sender,
-			"db_id":  id, 
+			"db_id":  id,
 		})
 	}
 	return notifications, nil
@@ -209,7 +210,7 @@ func MarkNotificationsRead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		ErrorPage(w, 400, "Bad Request")
 		return
 	}
 
@@ -242,7 +243,7 @@ func GetNotifications(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	notifications, err := fetchUnreadNotifications(nickname) 
+	notifications, err := fetchUnreadNotifications(nickname)
 	if err != nil {
 		http.Error(w, "Failed to fetch notifications", http.StatusInternalServerError)
 		return

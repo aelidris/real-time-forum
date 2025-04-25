@@ -127,7 +127,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := r.ParseForm()
 	if err != nil {
-		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
+		ErrorPage(w, 400, "Bad Request")
 		return
 	}
 

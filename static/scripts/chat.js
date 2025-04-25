@@ -101,7 +101,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     
     socket.onclose = (event) => {
         console.log("Disconnected from WebSocket server", event.reason);
-        localStorage.removeItem('nickname')
         if (event.reason === "User logged out") {
             document.querySelectorAll('.status-dot').forEach(dot => {
               dot.classList.remove('online');

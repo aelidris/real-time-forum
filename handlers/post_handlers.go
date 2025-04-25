@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	
 	"forum/database"
 	"forum/models"
 	"forum/utils"
@@ -29,15 +28,7 @@ func HomePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.URL.Path != "/" {
-		w.WriteHeader(http.StatusNotFound)
-		tmpl := `<html>
-                    <head><title>Page Not Found</title></head>
-                    <body>
-                        <h1>404 - Page Not Found</h1>
-                    </body>
-                 </html>`
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(tmpl))
+		ErrorPage(w, 404, "Page Not Found")
 		return
 	}
 
@@ -219,7 +210,7 @@ func ShowPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func PostSubmit(w http.ResponseWriter, r *http.Request) {
-	nickname, sessionToken, loggedIn, _ := RequireLogin(w, r) 
+	nickname, sessionToken, loggedIn, _ := RequireLogin(w, r)
 	response := make(map[string]interface{})
 
 	if !loggedIn {

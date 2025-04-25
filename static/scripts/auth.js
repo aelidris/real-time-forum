@@ -133,6 +133,8 @@ function handleResponse(response) {
   });
 }
 
+
+
 function clearErrors() {
   document.querySelectorAll(".error-message").forEach(el => {
     el.textContent = "";

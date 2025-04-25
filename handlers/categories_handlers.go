@@ -10,7 +10,7 @@ import (
 
 func GetCategories(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		ErrorPage(w, 405, "Status Not Allowed")
 		return
 	}
 
