@@ -256,9 +256,9 @@ function setupScrollHandler(nickname) {
         if (scrollDebounceTimer) {
             clearTimeout(scrollDebounceTimer);
         }
-        scrollDebounceTimer = setTimeout(async () => {
+        scrollDebounceTimer = setTimeout(() => {
             if (messageList.scrollTop < 50 && !isLoading && !allMessagesLoaded) {
-                await fetchHistoricalMessages(nickname, currentOffset, true);
+                fetchHistoricalMessages(nickname, currentOffset, true);
             }
         }, 500);
     });
