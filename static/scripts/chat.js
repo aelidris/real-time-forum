@@ -171,9 +171,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
                 badge.textContent = unreadCounts[sender];
                 userElement.appendChild(badge);
             }
-            setTimeout(() => {
-                userElement.style.backgroundColor = "";
-            }, 3000);
             
             updateOnlineUsersList();
         }
