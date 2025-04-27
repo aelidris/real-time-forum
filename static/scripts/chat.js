@@ -43,6 +43,7 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
     let currentOpenChat = null;
 
     const userList = document.getElementById("onlineUserList");
+    
     if (userList) {
         userList.innerHTML = '<li class="loading">Loading users...</li>';
     }
@@ -92,22 +93,13 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
         }
       });
 
-      socket.onopen = () => {
+    socket.onopen = () => {
         console.log("Connected to WebSocket server");
-        socket.send(JSON.stringify({
-            type: "requestOnlineUsers"
-        }));
+        
     };
     
-    socket.onclose = (event) => {
-        console.log("Disconnected from WebSocket server", event.reason);
-        if (event.reason === "User logged out") {
-            document.querySelectorAll('.status-dot').forEach(dot => {
-              dot.classList.remove('online');
-              dot.classList.add('offline');
-              dot.title = 'Offline';
-            });
-          }
+    socket.onclose = () => {
+        console.log("Disconnected from WebSocket server");
     };
     
     socket.onmessage = (event) => {
@@ -119,17 +111,15 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
                 allUsers.push({
                     nickname: newUser.nickname,
                     firstName: newUser.firstName,
-                    lastName: newUser.lastName,
-                    isOnline: false
+                    lastName: newUser.lastName
                 });
-                updateOnlineUsersList();
             }
             break;
           case "onlineUsers":
             onlineUsers = data.users;
             updateOnlineUsersList();
             break;
-          case "notification":
+          case "notification":            
             showNotification(data.sender);
             break;
           case "conversation_data":
@@ -161,8 +151,6 @@ function initializeChatSystem(nickname = localStorag.getItem('nickname')) {
         userActivity[sender] = Date.now();
         const userElement = document.querySelector(`.online-user[data-nickname="${sender}"]`);
         if (userElement) {
-            userElement.style.backgroundColor = "#f1a564";
-            userElement.style.transition = "background-color 0.3s ease";
             const existingBadges = userElement.querySelectorAll(".unread-badge");
             existingBadges.forEach(badge => badge.remove()); 
             if (unreadCounts[sender] > 0) {
@@ -243,12 +231,14 @@ function displayMessages(messages, messageList, append) {
     });
 
     if (append) {
-        const scrollPos = messageList.scrollTop;
-        const scrollHeight = messageList.scrollHeight;     
+        const scrollPos = messageList.scrollTop;        
+        const scrollHeight = messageList.scrollHeight;  
+           
         messageElements.reverse().forEach(msg => {
             messageList.insertBefore(msg, messageList.firstChild);
         });       
         messageList.scrollTop = scrollPos + (messageList.scrollHeight - scrollHeight);
+        
     } else {
         messageList.innerHTML = '';
         messageElements.forEach(msg => {
@@ -297,7 +287,7 @@ function setupScrollHandler(nickname) {
             chatBox.style.display = "block";
             currentOpenChat = nickname;
             
-            await fetchHistoricalMessages(nickname);
+            await fetchHistoricalMessages(nickname,);
             setupScrollHandler(nickname);
             resetUnreadCount(nickname);
     
@@ -542,17 +532,6 @@ const displayPrivateMessage = (data) => {
         }
     };
     
-    const userStatusInterval = setInterval(() => {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                type: "requestOnlineUsers"
-            }));
-        }
-    }, 30000);
-    
-    window.addEventListener('beforeunload', () => {
-        clearInterval(userStatusInterval);
-    });
   }
 
 document.addEventListener("DOMContentLoaded", () => {
