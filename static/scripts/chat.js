@@ -388,7 +388,8 @@ function setupScrollHandler(nickname) {
         });
       }
     });
-
+    console.log(combinedUsers);
+    
     updateOnlineUsers(combinedUsers);
 };
 
@@ -505,13 +506,7 @@ const displayPrivateMessage = (data) => {
     if (chatWith && !conversations.includes(chatWith)) {
         conversations.push(chatWith);
         window.conversationData.with_conversations = conversations;
-        
-        if (socket?.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                type: "update_conversations",
-                with_conversations: conversations
-            }));
-        }
+    
     }
 
     updateOnlineUsersList();
